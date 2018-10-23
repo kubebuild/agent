@@ -1,14 +1,18 @@
-package queries
+package scalar
 
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/ghodss/yaml"
 	"github.com/shurcooL/graphql"
 )
+
+var logger = logrus.New()
 
 // Note: These custom types are meant to be used in queries for now.
 // But the plan is to switch to using native Go types (string, int, bool, time.Time, etc.).
@@ -56,8 +60,8 @@ type (
 	// URI is an RFC 3986, RFC 3987, and RFC 6570 (level 4) compliant URI.
 	URI struct{ *url.URL }
 
-	//WorkflowSpec argo workflow
-	WorkflowSpec struct{ *wfv1.WorkflowSpec }
+	//WorkflowYaml argo workflow
+	WorkflowYaml struct{ *wfv1.Workflow }
 )
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -68,29 +72,24 @@ func (u URI) MarshalJSON() ([]byte, error) {
 
 // MarshalJSON implements the json.Marshaler interface.
 // The template is yaml
-func (w WorkflowSpec) MarshalJSON() ([]byte, error) {
+func (w WorkflowYaml) MarshalJSON() ([]byte, error) {
 	return yaml.Marshal(w)
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
 // The template is yaml
-func (w *WorkflowSpec) UnmarshalJSON(data []byte) error {
-	// Ignore null, like in the main JSON package.
-	if string(data) == "null" {
-		return nil
-	}
-
-	wfc, err := yaml.YAMLToJSON(data)
+func (w *WorkflowYaml) UnmarshalJSON(data []byte) error {
+	s, err := strconv.Unquote(string(data))
 	if err != nil {
 		return err
 	}
-	res := &wfv1.WorkflowSpec{}
-	err = json.Unmarshal(wfc, res)
+	var wf wfv1.Workflow
+	err = yaml.Unmarshal([]byte(s), &wf)
 	if err != nil {
 		return err
 	}
-	w.WorkflowSpec = res
-	return err
+	w.Workflow = &wf
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

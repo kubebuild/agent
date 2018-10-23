@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/kubebuild/agent/pkg/mutations"
 	"github.com/kubebuild/agent/pkg/schedulers"
 	"github.com/shurcooL/graphql"
 )
@@ -28,10 +29,18 @@ func NewApp(config Configurer) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	logger.WithFields(
+		logrus.Fields{
+			"version":     config.GetVersion(),
+			"name":        config.GetName(),
+			"grapqhl-url": config.GetGraphqlURL(),
+		}).Info("Starting app ...")
 	app.Log = logger
 	app.GraphqlClient = newGraphqlClient(config)
 
-	buildScheduler := schedulers.NewBuildScheduler(config.GetToken(), logger, app.GraphqlClient)
+	clusterMutation := mutations.ConnectCluster(config.GetToken(), app.GraphqlClient, logger)
+
+	buildScheduler := schedulers.NewBuildScheduler(clusterMutation.ConnectCluster.Result, logger, app.GraphqlClient)
 	app.Schedulers = append(app.Schedulers, buildScheduler)
 
 	return app, nil

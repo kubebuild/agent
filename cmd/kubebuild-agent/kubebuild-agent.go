@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 
 	agent "github.com/kubebuild/agent/pkg/app"
@@ -54,8 +53,6 @@ func main() {
 			LogLevel:   logLevel,
 		}
 		app, err := agent.NewApp(config)
-		ci, _ := json.Marshal(config)
-		app.Log.Info(string(ci))
 		if err != nil {
 			panic("Error occured exiting...")
 		}
