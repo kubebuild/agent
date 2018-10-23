@@ -49,7 +49,6 @@ type BuildQuery struct {
 // GetBuilds return the builds query
 func GetBuilds(clusterToken string, client *graphql.Client, log *logrus.Logger) *BuildQuery {
 	q := &BuildQuery{}
-
 	variables := map[string]interface{}{
 		"clusterToken": clusterToken,
 	}
