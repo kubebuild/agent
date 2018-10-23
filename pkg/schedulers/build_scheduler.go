@@ -26,7 +26,7 @@ func NewBuildScheduler(token string, log *logrus.Logger, graphqlClient *graphql.
 // Start starts a timer loop querying builds.
 func (b *BuildScheduler) Start() {
 	utils.SetInterval(func() {
-		result := queries.GetBuilds(b.token, b.graphqlClient, b.log)
-		b.log.Info(result)
+		result, _ := queries.GetBuilds(b.token, b.graphqlClient, b.log)
+		b.log.Debug(result)
 	}, 2000, false)
 }

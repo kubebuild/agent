@@ -36,7 +36,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "log-level",
-			Value: "error",
+			Value: "info",
 			Usage: "log level",
 		},
 	}

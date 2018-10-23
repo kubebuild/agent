@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/kubebuild/agent/pkg/utils"
 	"github.com/shurcooL/graphql"
 )
 
@@ -48,12 +47,15 @@ type BuildQuery struct {
 }
 
 // GetBuilds return the builds query
-func GetBuilds(clusterToken string, client *graphql.Client, log *logrus.Logger) *BuildQuery {
+func GetBuilds(clusterToken string, client *graphql.Client, log *logrus.Logger) (*BuildQuery, error) {
 	q := &BuildQuery{}
 	variables := map[string]interface{}{
 		"clusterToken": clusterToken,
 	}
 	err := client.Query(context.Background(), q, variables)
-	utils.LogError("Builds Query failed", err, log)
-	return q
+	if err != nil {
+		log.WithError(err).Error("BuildsQuery Failed")
+		return nil, err
+	}
+	return q, nil
 }
