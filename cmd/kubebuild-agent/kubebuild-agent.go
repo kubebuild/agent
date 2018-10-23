@@ -57,7 +57,7 @@ func main() {
 		ci, _ := json.Marshal(config)
 		app.Log.Info(string(ci))
 		if err != nil {
-			panic("Error occured")
+			panic("Error occured exiting...")
 		}
 		app.StartSchedulers()
 		app.WaitForInterrupt()
