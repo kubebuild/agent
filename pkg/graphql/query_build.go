@@ -1,13 +1,9 @@
-package queries
+package graphql
 
 import (
 	"context"
 
-	"github.com/kubebuild/agent/pkg/mutations"
 	"github.com/kubebuild/agent/pkg/types"
-
-	"github.com/shurcooL/graphql"
-	"github.com/sirupsen/logrus"
 )
 
 type cluster struct {
@@ -30,14 +26,17 @@ type ScheduledBuild struct {
 	}
 }
 
+//RunningBuild struct for running build info
+type RunningBuild struct {
+	ID      types.ID
+	Cluster cluster
+}
+
 // BuildQuery query for builds
 type BuildQuery struct {
 	Scheduled []ScheduledBuild `graphql:"scheduled: buildsInCluster(clusterToken: $clusterToken, buildState: SCHEDULED)"`
-	Running   []struct {
-		ID      types.ID
-		Cluster cluster
-	} `graphql:"running: buildsInCluster(clusterToken: $clusterToken, buildState: RUNNING)"`
-	Blocked []struct {
+	Running   []RunningBuild   `graphql:"running: buildsInCluster(clusterToken: $clusterToken, buildState: RUNNING)"`
+	Blocked   []struct {
 		ID              types.ID
 		FinishedAt      types.DateTime
 		ResumeSuspended types.Boolean
@@ -53,14 +52,14 @@ type BuildQuery struct {
 }
 
 // GetBuilds return the builds query
-func GetBuilds(cluster mutations.Cluster, client *graphql.Client, log *logrus.Logger) (*BuildQuery, error) {
+func (c *Client) GetBuilds() (*BuildQuery, error) {
 	q := &BuildQuery{}
 	variables := map[string]interface{}{
-		"clusterToken": cluster.Token,
+		"clusterToken": c.Cluster.Token,
 	}
-	err := client.Query(context.Background(), q, variables)
+	err := c.GraphqlClient.Query(context.Background(), q, variables)
 	if err != nil {
-		log.WithError(err).Error("BuildsQuery Failed")
+		c.Log.WithError(err).Error("BuildsQuery Failed")
 		return nil, err
 	}
 	return q, nil

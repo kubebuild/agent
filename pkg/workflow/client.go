@@ -9,7 +9,7 @@ import (
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	wfclientset "github.com/argoproj/argo/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
-	"github.com/kubebuild/agent/pkg/mutations"
+	"github.com/kubebuild/agent/pkg/graphql"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -87,7 +87,7 @@ func initKubeClient(inCluster bool, kubectlPath string, log *logrus.Logger) *kub
 }
 
 // InitWorkflowClient creates a new client for the Kubernetes Workflow CRD.
-func InitWorkflowClient(cluster mutations.Cluster, inCluster bool, kubectlPath string, log *logrus.Logger) v1alpha1.WorkflowInterface {
+func InitWorkflowClient(cluster graphql.Cluster, inCluster bool, kubectlPath string, log *logrus.Logger) v1alpha1.WorkflowInterface {
 	if wfClient != nil {
 		return wfClient
 	}

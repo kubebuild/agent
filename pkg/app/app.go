@@ -6,12 +6,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kubebuild/agent/pkg/graphql"
+
 	"github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
-	"github.com/kubebuild/agent/pkg/mutations"
 	"github.com/kubebuild/agent/pkg/schedulers"
 	"github.com/kubebuild/agent/pkg/utils"
 	"github.com/kubebuild/agent/pkg/workflow"
-	"github.com/shurcooL/graphql"
+	gql "github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,15 +42,13 @@ func NewApp(config Configurer) (*App, error) {
 			"grapqhl-url": config.GetGraphqlURL(),
 		}).Info("Starting app ...")
 	app.Log = logger
-	app.GraphqlClient = newGraphqlClient(config)
+	app.GraphqlClient = newGraphqlClient(config, app.Log)
 
-	cluster := mutations.ConnectCluster(config.GetToken(), app.GraphqlClient, logger)
-
-	client := workflow.InitWorkflowClient(cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
+	client := workflow.InitWorkflowClient(app.GraphqlClient.Cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
 
 	app.WorkflowClient = client
 
-	buildScheduler := schedulers.NewBuildScheduler(cluster, app.WorkflowClient, app.GraphqlClient, logger)
+	buildScheduler := schedulers.NewBuildScheduler(app.WorkflowClient, app.GraphqlClient, logger)
 	app.Schedulers = append(app.Schedulers, buildScheduler)
 
 	return app, nil
@@ -63,9 +62,11 @@ func newLogger(config Configurer) (*logrus.Logger, error) {
 	return log, nil
 }
 
-func newGraphqlClient(config Configurer) *graphql.Client {
-	client := graphql.NewClient(config.GetGraphqlURL(), nil)
-	return client
+func newGraphqlClient(config Configurer, log *logrus.Logger) *graphql.Client {
+	client := gql.NewClient(config.GetGraphqlURL(), nil)
+	graphqlClient := graphql.NewGraphqlClient(client, log)
+	graphqlClient.ConnectCluster(config.GetToken())
+	return graphqlClient
 }
 
 // WaitForInterrupt starts an infinite loop only broken by Ctrl-C

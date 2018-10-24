@@ -6,8 +6,7 @@ import (
 
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/argoproj/argo/workflow/util"
-	"github.com/kubebuild/agent/pkg/mutations"
-	"github.com/kubebuild/agent/pkg/queries"
+	"github.com/kubebuild/agent/pkg/graphql"
 )
 
 // Build labels
@@ -15,10 +14,11 @@ var (
 	BuildIDLabel       = "kubebuild.com/build-id"
 	BuildNumberLabel   = "kubebuild.com/build-number"
 	BuildUploaderLabel = "kubebuild.com/is-uploader"
+	BuildBranchLabel   = "kubebuild.com/build-branch"
 )
 
 // GetBuildOpts lol
-func GetBuildOpts(cluster mutations.Cluster, build queries.ScheduledBuild) *util.SubmitOpts {
+func GetBuildOpts(cluster graphql.Cluster, build graphql.ScheduledBuild) *util.SubmitOpts {
 	opts := &util.SubmitOpts{
 		InstanceID:     string(cluster.Name),
 		ServiceAccount: fmt.Sprintf("%s-kubebuild-launcher", cluster.Name),
@@ -27,7 +27,7 @@ func GetBuildOpts(cluster mutations.Cluster, build queries.ScheduledBuild) *util
 	return opts
 }
 
-func getParams(cluster mutations.Cluster, build queries.ScheduledBuild) []string {
+func getParams(cluster graphql.Cluster, build graphql.ScheduledBuild) []string {
 	repo := fmt.Sprintf("repo=%s", build.Pipeline.GitURL)
 	revision := fmt.Sprintf("revision=%s", build.Commit)
 	buildNumber := fmt.Sprintf("buildNumber=%d", build.BuildNumber)
@@ -39,7 +39,7 @@ func getParams(cluster mutations.Cluster, build queries.ScheduledBuild) []string
 }
 
 // AddBuildLabels adds the labels for the build
-func AddBuildLabels(build queries.ScheduledBuild, isUploading bool, wf *wfv1.Workflow) {
+func AddBuildLabels(build graphql.ScheduledBuild, isUploading bool, wf *wfv1.Workflow) {
 	labels := wf.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
@@ -48,5 +48,6 @@ func AddBuildLabels(build queries.ScheduledBuild, isUploading bool, wf *wfv1.Wor
 	labels[BuildIDLabel] = build.ID.(string)
 	labels[BuildNumberLabel] = strconv.Itoa(int(build.BuildNumber))
 	labels[BuildUploaderLabel] = strconv.FormatBool(isUploading)
+	labels[BuildBranchLabel] = string(build.Branch)
 	wf.SetLabels(labels)
 }

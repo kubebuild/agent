@@ -1,11 +1,9 @@
-package mutations
+package graphql
 
 import (
 	"context"
 
 	"github.com/kubebuild/agent/pkg/types"
-	"github.com/shurcooL/graphql"
-	"github.com/sirupsen/logrus"
 )
 
 //BuildWithID Build just with ID
@@ -24,7 +22,7 @@ type updateBuilMutation struct {
 type BuildMutationParams struct {
 	BuildID       types.ID
 	ClusterToken  types.String
-	Workflow      types.WorkflowYaml
+	Workflow      types.JSON
 	StartedAt     types.DateTime
 	FinishedAt    types.DateTime
 	State         types.String
@@ -32,24 +30,29 @@ type BuildMutationParams struct {
 }
 
 //UpdateClusterBuild variations
-func UpdateClusterBuild(params BuildMutationParams, graphqlClient *graphql.Client, log *logrus.Logger) BuildWithID {
+func (m *Client) UpdateClusterBuild(params BuildMutationParams) (BuildWithID, error) {
 	buildMutation := &updateBuilMutation{}
 
 	variables := map[string]interface{}{
 		"buildId":       params.BuildID,
 		"clusterToken":  params.ClusterToken,
 		"workflow":      params.Workflow,
-		"startedAt":     params.StartedAt,
-		"finishedAt":    params.FinishedAt,
 		"state":         params.State,
 		"logsFinalized": params.LogsFinalized,
 	}
-	err := graphqlClient.Mutate(context.Background(), buildMutation, variables)
+	if !params.StartedAt.IsZero() {
+		variables["startedAt"] = params.StartedAt
+	}
+	if !params.FinishedAt.IsZero() {
+		variables["finishedAt"] = params.FinishedAt
+	}
+	err := m.GraphqlClient.Mutate(context.Background(), buildMutation, variables)
 	if err != nil {
-		log.WithError(err).Error("Build update request failed")
+		m.Log.WithError(err).Error("Build update request failed")
+		return BuildWithID{}, err
 	}
 	if !buildMutation.UpdateClusterBuild.Successful {
-		log.Error("Update build failed")
+		m.Log.Error("Update build failed")
 	}
-	return buildMutation.UpdateClusterBuild.Result
+	return buildMutation.UpdateClusterBuild.Result, nil
 }

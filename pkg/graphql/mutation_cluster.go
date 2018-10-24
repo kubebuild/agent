@@ -1,13 +1,10 @@
-package mutations
+package graphql
 
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kubebuild/agent/pkg/types"
 	"github.com/kubebuild/agent/pkg/utils"
-	"github.com/shurcooL/graphql"
 )
 
 //Cluster Type
@@ -27,23 +24,24 @@ type ClusterMutation struct {
 }
 
 // ConnectCluster mutation
-func ConnectCluster(clusterToken string, graphqlClient *graphql.Client, log *logrus.Logger) Cluster {
+func (m *Client) ConnectCluster(clusterToken string) Cluster {
 	regions := utils.CalcLatency(1, false, "s3")
 	logRegion := regions.Get(0).Code
-	log.WithField("logRegion", logRegion).Debug("Log region")
+	m.Log.WithField("logRegion", logRegion).Debug("Log region")
 	connectClusterMutation := &ClusterMutation{}
 	variables := map[string]interface{}{
 		"token":     clusterToken,
 		"logRegion": logRegion,
 	}
-	err := graphqlClient.Mutate(context.Background(), connectClusterMutation, variables)
+	err := m.GraphqlClient.Mutate(context.Background(), connectClusterMutation, variables)
 	if err != nil {
-		log.WithError(err).Error("Cluster request failed")
+		m.Log.WithError(err).Error("Cluster request failed")
 		panic("Cannot get cluster")
 	}
 	if !connectClusterMutation.ConnectCluster.Successful {
-		log.Error("Connect cluster failed")
+		m.Log.Error("Connect cluster failed")
 		panic("connect cluster failed")
 	}
-	return connectClusterMutation.ConnectCluster.Result
+	m.Cluster = connectClusterMutation.ConnectCluster.Result
+	return m.Cluster
 }

@@ -171,6 +171,26 @@
   version = "v0.2.0"
 
 [[projects]]
+  digest = "1:42ffe09fcfb07a89393cac6533d19583f5b89962f287553a5249a6586ac42e4d"
+  name = "github.com/graphql-go/graphql"
+  packages = [
+    ".",
+    "gqlerrors",
+    "language/ast",
+    "language/kinds",
+    "language/lexer",
+    "language/location",
+    "language/parser",
+    "language/printer",
+    "language/source",
+    "language/typeInfo",
+    "language/visitor",
+  ]
+  pruneopts = "NUT"
+  revision = "5c1be0872a56fba73b279434ea95dfda735abedd"
+  version = "v0.7.6"
+
+[[projects]]
   digest = "1:b42cde0e1f3c816dd57f57f7bbcf05ca40263ad96f168714c130c611fc0856a6"
   name = "github.com/hashicorp/golang-lru"
   packages = [
@@ -577,11 +597,12 @@
     "github.com/argoproj/argo/pkg/client/clientset/versioned",
     "github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1",
     "github.com/argoproj/argo/workflow/util",
+    "github.com/argoproj/argo/workflow/validate",
     "github.com/ghodss/yaml",
+    "github.com/graphql-go/graphql",
     "github.com/shurcooL/graphql",
     "github.com/sirupsen/logrus",
     "github.com/urfave/cli",
-    "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",

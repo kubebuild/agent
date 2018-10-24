@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 	"time"
@@ -42,7 +43,7 @@ type (
 
 	// ID represents a unique identifier that is Base64 obfuscated. It
 	// is often used to refetch an object or as key for a cache. The ID
-	// type appears in a JSON response as a String; however, it is not
+	// type appears in a Json response as a String; however, it is not
 	// intended to be human-readable. When expected as an input type,
 	// any string (such as "VXNlci0xMA==") or integer (such as 4) input
 	// value will be accepted as an ID.
@@ -62,6 +63,9 @@ type (
 
 	//WorkflowYaml argo workflow
 	WorkflowYaml struct{ *wfv1.Workflow }
+
+	//JSON argo workflow
+	JSON struct{ *wfv1.Workflow }
 )
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -71,9 +75,34 @@ func (u URI) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
+// The workflow is json
+func (w JSON) MarshalJSON() ([]byte, error) {
+	wfc, err := json.Marshal(w.Workflow)
+	quote := strconv.Quote(string(wfc))
+	fmt.Printf(quote)
+	return []byte(quote), err
+}
+
+// UnmarshalJSON implements the json.Marshaler interface.
+// The template is yaml
+func (w *JSON) UnmarshalJSON(data []byte) error {
+	s, err := strconv.Unquote(string(data))
+	if err != nil {
+		return err
+	}
+	var wf wfv1.Workflow
+	err = json.Unmarshal([]byte(s), &wf)
+	if err != nil {
+		return err
+	}
+	w.Workflow = &wf
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface.
 // The template is yaml
 func (w WorkflowYaml) MarshalJSON() ([]byte, error) {
-	return yaml.Marshal(w)
+	return yaml.Marshal(w.Workflow)
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -95,7 +124,7 @@ func (w *WorkflowYaml) UnmarshalJSON(data []byte) error {
 // UnmarshalJSON implements the json.Unmarshaler interface.
 // The URI is expected to be a quoted string.
 func (u *URI) UnmarshalJSON(data []byte) error {
-	// Ignore null, like in the main JSON package.
+	// Ignore null, like in the main Json package.
 	if string(data) == "null" {
 		return nil
 	}
