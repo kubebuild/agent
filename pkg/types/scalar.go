@@ -1,4 +1,4 @@
-package scalar
+package types
 
 import (
 	"encoding/json"
@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/ghodss/yaml"
 	"github.com/shurcooL/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 var logger = logrus.New()

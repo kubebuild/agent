@@ -11,7 +11,7 @@
       "mode": "auto",
       "program": "${fileDirname}",
       "env": {},
-      "args": ["--token", "dev-token", "--graphql-url", "http://localhost:4000/graphql", "--log-level", "debug"]
+      "args": ["--token", "dev-token", "--graphql-url", "http://localhost:4000/graphql", "--log-level", "debug", "--kubectl-path", "/Users/andrei/.kube/config"]
     }
   ]
 }

@@ -1,8 +1,8 @@
 package schedulers
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/shurcooL/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 // AgentUpdateScheduler schedule your agent updates

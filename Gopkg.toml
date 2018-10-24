@@ -35,13 +35,5 @@
   name = "github.com/shurcooL/graphql"
 
 [[constraint]]
-  name = "github.com/Sirupsen/logrus"
-  version = "1.1.1"
-
-[[constraint]]
   name = "github.com/urfave/cli"
   version = "1.20.0"
-
-[[constraint]]
-  name = "github.com/ghodss/yaml"
-  version = "1.0.0"

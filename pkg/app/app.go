@@ -4,19 +4,24 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
 	"github.com/kubebuild/agent/pkg/mutations"
 	"github.com/kubebuild/agent/pkg/schedulers"
+	"github.com/kubebuild/agent/pkg/utils"
+	"github.com/kubebuild/agent/pkg/workflow"
 	"github.com/shurcooL/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 // App provides a default app structure with Logger
 type App struct {
-	Config        Configurer
-	Log           *logrus.Logger
-	GraphqlClient *graphql.Client
-	Schedulers    []Scheduler
+	Config         Configurer
+	Log            *logrus.Logger
+	GraphqlClient  *graphql.Client
+	WorkflowClient v1alpha1.WorkflowInterface
+	Schedulers     []Scheduler
 }
 
 // NewApp configures and returns an App
@@ -38,9 +43,13 @@ func NewApp(config Configurer) (*App, error) {
 	app.Log = logger
 	app.GraphqlClient = newGraphqlClient(config)
 
-	clusterMutation := mutations.ConnectCluster(config.GetToken(), app.GraphqlClient, logger)
+	cluster := mutations.ConnectCluster(config.GetToken(), app.GraphqlClient, logger)
 
-	buildScheduler := schedulers.NewBuildScheduler(clusterMutation.ConnectCluster.Result, logger, app.GraphqlClient)
+	client := workflow.InitWorkflowClient(cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
+
+	app.WorkflowClient = client
+
+	buildScheduler := schedulers.NewBuildScheduler(cluster, app.WorkflowClient, app.GraphqlClient, logger)
 	app.Schedulers = append(app.Schedulers, buildScheduler)
 
 	return app, nil
@@ -48,7 +57,7 @@ func NewApp(config Configurer) (*App, error) {
 
 func newLogger(config Configurer) (*logrus.Logger, error) {
 	log := logrus.New()
-	// log.Formatter = NewLogFormatter(config, &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+	log.Formatter = utils.NewLogFormatter(config.GetName(), config.GetVersion(), &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano})
 	log.Level = config.GetLogLevel()
 	log.Out = os.Stdout
 	return log, nil

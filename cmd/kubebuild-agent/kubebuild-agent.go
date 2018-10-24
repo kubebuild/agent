@@ -38,19 +38,32 @@ func main() {
 			Value: "info",
 			Usage: "log level",
 		},
+		cli.BoolFlag{
+			Name:  "in-cluster",
+			Usage: "pass in cluster false along with kubectl path",
+		},
+		cli.StringFlag{
+			Name:  "kubectl-path",
+			Value: "",
+			Usage: "path of kubectl for non in cluster",
+		},
 	}
 	app.Action = func(c *cli.Context) {
 		token := c.String("token")
+		inCluster := c.Bool("in-cluster")
+		kubectlPath := c.String("kubectl-path")
 		logLevel := c.String("log-level")
 		version := c.App.Version
 		name := c.App.Name
 		graphqlURL := c.String("graphql-url")
 		config := &agent.Config{
-			Name:       name,
-			Version:    version,
-			GraphqlURL: graphqlURL,
-			Token:      token,
-			LogLevel:   logLevel,
+			Name:        name,
+			Version:     version,
+			GraphqlURL:  graphqlURL,
+			Token:       token,
+			LogLevel:    logLevel,
+			InCluster:   inCluster,
+			KubectlPath: kubectlPath,
 		}
 		app, err := agent.NewApp(config)
 		if err != nil {

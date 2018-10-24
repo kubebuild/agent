@@ -4,47 +4,50 @@ import (
 	"context"
 
 	"github.com/kubebuild/agent/pkg/mutations"
-	"github.com/kubebuild/agent/pkg/scalar"
+	"github.com/kubebuild/agent/pkg/types"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/shurcooL/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 type cluster struct {
-	LogRegion    scalar.String
-	LogAwsKey    scalar.String
-	LogAwsSecret scalar.String
+	LogRegion    types.String
+	LogAwsKey    types.String
+	LogAwsSecret types.String
+}
+
+//ScheduledBuild type for scheduled builds
+type ScheduledBuild struct {
+	ID             types.ID
+	BuildNumber    types.Int
+	Branch         types.String
+	Commit         types.String
+	UploadPipeline types.Boolean
+	Template       types.WorkflowYaml
+	Pipeline       struct {
+		GitURL        types.String
+		GitSecretName types.String
+	}
 }
 
 // BuildQuery query for builds
 type BuildQuery struct {
-	Scheduled []struct {
-		ID             scalar.ID
-		BuildNumber    scalar.Int
-		Branch         scalar.String
-		Commit         scalar.String
-		UploadPipeline scalar.Boolean
-		Template       scalar.WorkflowYaml
-		Pipeline       struct {
-			GitURL        scalar.String
-			GitSecretName scalar.String
-		}
-	} `graphql:"scheduled: buildsInCluster(clusterToken: $clusterToken, buildState: SCHEDULED)"`
-	Running []struct {
-		ID      scalar.ID
+	Scheduled []ScheduledBuild `graphql:"scheduled: buildsInCluster(clusterToken: $clusterToken, buildState: SCHEDULED)"`
+	Running   []struct {
+		ID      types.ID
 		Cluster cluster
 	} `graphql:"running: buildsInCluster(clusterToken: $clusterToken, buildState: RUNNING)"`
 	Blocked []struct {
-		ID              scalar.ID
-		FinishedAt      scalar.DateTime
-		ResumeSuspended scalar.Boolean
+		ID              types.ID
+		FinishedAt      types.DateTime
+		ResumeSuspended types.Boolean
 	} `graphql:"blocked: buildsInCluster(clusterToken: $clusterToken, buildState: BLOCKED)"`
 	Logs []struct {
-		ID          scalar.ID
-		State       scalar.String
-		StartedAt   scalar.DateTime
-		FinishedAt  scalar.DateTime
-		ScheduledAt scalar.DateTime
+		ID          types.ID
+		State       types.String
+		StartedAt   types.DateTime
+		FinishedAt  types.DateTime
+		ScheduledAt types.DateTime
 		Cluster     cluster
 	} `graphql:"logs: buildsForLogs(clusterToken: $clusterToken)"`
 }

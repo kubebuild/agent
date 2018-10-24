@@ -1,6 +1,6 @@
 package app
 
-import "github.com/Sirupsen/logrus"
+import "github.com/sirupsen/logrus"
 
 // Configurer interface allows individual app config structs to inherit Fields
 // from Config and still be used by the agent .
@@ -10,20 +10,34 @@ type Configurer interface {
 	GetToken() string
 	GetLogLevel() logrus.Level
 	GetGraphqlURL() string
+	GetKubectlPath() string
+	GetInCluster() bool
 }
 
 // Config contains the base configuration fields required for the agent app.
 type Config struct {
-	Name       string
-	Version    string
-	Token      string
-	LogLevel   string
-	GraphqlURL string
+	Name        string
+	Version     string
+	Token       string
+	LogLevel    string
+	GraphqlURL  string
+	InCluster   bool
+	KubectlPath string
 }
 
 // GetName app name.
 func (c *Config) GetName() string {
 	return c.Name
+}
+
+//GetInCluster app name.
+func (c *Config) GetInCluster() bool {
+	return c.InCluster
+}
+
+//GetKubectlPath app name.
+func (c *Config) GetKubectlPath() string {
+	return c.KubectlPath
 }
 
 // GetGraphqlURL app name.
