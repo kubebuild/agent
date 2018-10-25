@@ -61,9 +61,6 @@ func (b *BuildScheduler) Start() {
 		for _, build := range result.Blocked {
 			b.log.Debug(build)
 		}
-		// for _, build := range result.Logs {
-		// 	b.log.Debug(build)
-		// }
 	}, 2000, false)
 }
 
