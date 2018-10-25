@@ -23,8 +23,7 @@ func NewLogFormatter(name string, version string, formatter logrus.Formatter) *L
 // Format adds standard fields to all log output.
 func (f *LogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	wrappedEntry := entry.WithFields(logrus.Fields{
-		"application": f.name,
-		"version":     f.version,
+		"version": f.version,
 	})
 	wrappedEntry.Time = entry.Time
 	wrappedEntry.Message = entry.Message

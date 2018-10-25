@@ -18,7 +18,7 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:d255e3d914d8785bd558c26517d9a64191448e7c2a0f8f56af9cf01d52b0798b"
+  digest = "1:d81cb433187865438de69e871488e4fc6398f900bcbc276013d9dc2093576cca"
   name = "github.com/argoproj/argo"
   packages = [
     ".",
@@ -28,6 +28,11 @@
     "pkg/client/clientset/versioned",
     "pkg/client/clientset/versioned/scheme",
     "pkg/client/clientset/versioned/typed/workflow/v1alpha1",
+    "pkg/client/informers/externalversions",
+    "pkg/client/informers/externalversions/internalinterfaces",
+    "pkg/client/informers/externalversions/workflow",
+    "pkg/client/informers/externalversions/workflow/v1alpha1",
+    "pkg/client/listers/workflow/v1alpha1",
     "util/cmd",
     "util/retry",
     "util/unstructured",
@@ -41,11 +46,58 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9eacec8a290837e78e83dcd4f7f708df24e11f15fbfd562ac838cc7a0c01697e"
+  digest = "1:1e8217b8eaaa458ae7fe16c0c7994899341033ab43a451c8f0c36131de2a52f4"
   name = "github.com/argoproj/pkg"
-  packages = ["json"]
+  packages = [
+    "errors",
+    "json",
+  ]
   pruneopts = "NUT"
   revision = "1aa3e0c55668da17703adba5c534fff6930db589"
+
+[[projects]]
+  digest = "1:6e77b7993a7a7bdae0bcd6ea95ab6ccb2673adde8c114a0b1b23c99a8a8b1f3d"
+  name = "github.com/aws/aws-sdk-go"
+  packages = [
+    "aws",
+    "aws/awserr",
+    "aws/awsutil",
+    "aws/client",
+    "aws/client/metadata",
+    "aws/corehandlers",
+    "aws/credentials",
+    "aws/credentials/ec2rolecreds",
+    "aws/credentials/endpointcreds",
+    "aws/credentials/stscreds",
+    "aws/csm",
+    "aws/defaults",
+    "aws/ec2metadata",
+    "aws/endpoints",
+    "aws/request",
+    "aws/session",
+    "aws/signer/v4",
+    "internal/ini",
+    "internal/s3err",
+    "internal/sdkio",
+    "internal/sdkrand",
+    "internal/sdkuri",
+    "internal/shareddefaults",
+    "private/protocol",
+    "private/protocol/eventstream",
+    "private/protocol/eventstream/eventstreamapi",
+    "private/protocol/query",
+    "private/protocol/query/queryutil",
+    "private/protocol/rest",
+    "private/protocol/restxml",
+    "private/protocol/xml/xmlutil",
+    "service/s3",
+    "service/s3/s3iface",
+    "service/s3/s3manager",
+    "service/sts",
+  ]
+  pruneopts = "NUT"
+  revision = "c446a547f59665b7ce54ac57bd8f8b04e5179563"
+  version = "v1.15.62"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -171,26 +223,6 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:42ffe09fcfb07a89393cac6533d19583f5b89962f287553a5249a6586ac42e4d"
-  name = "github.com/graphql-go/graphql"
-  packages = [
-    ".",
-    "gqlerrors",
-    "language/ast",
-    "language/kinds",
-    "language/lexer",
-    "language/location",
-    "language/parser",
-    "language/printer",
-    "language/source",
-    "language/typeInfo",
-    "language/visitor",
-  ]
-  pruneopts = "NUT"
-  revision = "5c1be0872a56fba73b279434ea95dfda735abedd"
-  version = "v0.7.6"
-
-[[projects]]
   digest = "1:b42cde0e1f3c816dd57f57f7bbcf05ca40263ad96f168714c130c611fc0856a6"
   name = "github.com/hashicorp/golang-lru"
   packages = [
@@ -224,6 +256,13 @@
   pruneopts = "NUT"
   revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
   version = "v1.0"
+
+[[projects]]
+  digest = "1:ac6d01547ec4f7f673311b4663909269bfb8249952de3279799289467837c3cc"
+  name = "github.com/jmespath/go-jmespath"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "0b12d6b5"
 
 [[projects]]
   digest = "1:8e36686e8b139f8fe240c1d5cf3a145bc675c22ff8e707857cdd3ae17b00d728"
@@ -596,15 +635,23 @@
     "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1",
     "github.com/argoproj/argo/pkg/client/clientset/versioned",
     "github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1",
+    "github.com/argoproj/argo/pkg/client/informers/externalversions",
     "github.com/argoproj/argo/workflow/util",
     "github.com/argoproj/argo/workflow/validate",
+    "github.com/argoproj/pkg/errors",
+    "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/credentials",
+    "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/ghodss/yaml",
-    "github.com/graphql-go/graphql",
     "github.com/shurcooL/graphql",
     "github.com/sirupsen/logrus",
     "github.com/urfave/cli",
+    "k8s.io/api/core/v1",
+    "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api",
   ]

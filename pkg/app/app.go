@@ -6,6 +6,8 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/kubebuild/agent/pkg/graphql"
 
 	"github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
@@ -22,6 +24,7 @@ type App struct {
 	Log            *logrus.Logger
 	GraphqlClient  *graphql.Client
 	WorkflowClient v1alpha1.WorkflowInterface
+	KubeClient     kubernetes.Interface
 	Schedulers     []Scheduler
 }
 
@@ -44,11 +47,12 @@ func NewApp(config Configurer) (*App, error) {
 	app.Log = logger
 	app.GraphqlClient = newGraphqlClient(config, app.Log)
 
-	client := workflow.InitWorkflowClient(app.GraphqlClient.Cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
+	wfClient, kubeClient := workflow.InitWorkflowClient(app.GraphqlClient.Cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
 
-	app.WorkflowClient = client
+	app.KubeClient = kubeClient
+	app.WorkflowClient = wfClient
 
-	buildScheduler := schedulers.NewBuildScheduler(app.WorkflowClient, app.GraphqlClient, logger)
+	buildScheduler := schedulers.NewBuildScheduler(app.WorkflowClient, app.GraphqlClient, app.KubeClient, app.Log)
 	app.Schedulers = append(app.Schedulers, buildScheduler)
 
 	return app, nil
@@ -56,7 +60,7 @@ func NewApp(config Configurer) (*App, error) {
 
 func newLogger(config Configurer) (*logrus.Logger, error) {
 	log := logrus.New()
-	log.Formatter = utils.NewLogFormatter(config.GetName(), config.GetVersion(), &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+	log.Formatter = utils.NewLogFormatter(config.GetName(), config.GetVersion(), &logrus.TextFormatter{TimestampFormat: time.RFC3339Nano, FullTimestamp: true})
 	log.Level = config.GetLogLevel()
 	log.Out = os.Stdout
 	return log, nil

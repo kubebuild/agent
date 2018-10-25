@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strconv"
 	"time"
@@ -79,7 +78,6 @@ func (u URI) MarshalJSON() ([]byte, error) {
 func (w JSON) MarshalJSON() ([]byte, error) {
 	wfc, err := json.Marshal(w.Workflow)
 	quote := strconv.Quote(string(wfc))
-	fmt.Printf(quote)
 	return []byte(quote), err
 }
 

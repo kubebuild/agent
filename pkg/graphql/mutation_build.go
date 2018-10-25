@@ -22,29 +22,31 @@ type updateBuilMutation struct {
 type BuildMutationParams struct {
 	BuildID       types.ID
 	ClusterToken  types.String
-	Workflow      types.JSON
-	StartedAt     types.DateTime
-	FinishedAt    types.DateTime
+	Workflow      *types.JSON `json:"omitempty"`
+	StartedAt     *types.DateTime
+	FinishedAt    *types.DateTime
 	State         types.String
-	LogsFinalized types.Boolean
+	LogsFinalized *types.Boolean
 }
 
 //UpdateClusterBuild variations
 func (m *Client) UpdateClusterBuild(params BuildMutationParams) (BuildWithID, error) {
 	buildMutation := &updateBuilMutation{}
 
+	if params.StartedAt != nil && params.StartedAt.IsZero() {
+		params.StartedAt = nil
+	}
+	if params.FinishedAt != nil && params.FinishedAt.IsZero() {
+		params.FinishedAt = nil
+	}
 	variables := map[string]interface{}{
 		"buildId":       params.BuildID,
 		"clusterToken":  params.ClusterToken,
 		"workflow":      params.Workflow,
 		"state":         params.State,
 		"logsFinalized": params.LogsFinalized,
-	}
-	if !params.StartedAt.IsZero() {
-		variables["startedAt"] = params.StartedAt
-	}
-	if !params.FinishedAt.IsZero() {
-		variables["finishedAt"] = params.FinishedAt
+		"startedAt":     params.StartedAt,
+		"finishedAt":    params.FinishedAt,
 	}
 	err := m.GraphqlClient.Mutate(context.Background(), buildMutation, variables)
 	if err != nil {

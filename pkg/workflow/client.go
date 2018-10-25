@@ -22,6 +22,7 @@ var (
 	restConfig       *rest.Config
 	clientConfig     clientcmd.ClientConfig
 	clientset        *kubernetes.Clientset
+	kubeClient       kubernetes.Interface
 	wfClient         v1alpha1.WorkflowInterface
 	jobStatusIconMap map[wfv1.NodePhase]string
 	noColor          bool
@@ -87,16 +88,17 @@ func initKubeClient(inCluster bool, kubectlPath string, log *logrus.Logger) *kub
 }
 
 // InitWorkflowClient creates a new client for the Kubernetes Workflow CRD.
-func InitWorkflowClient(cluster graphql.Cluster, inCluster bool, kubectlPath string, log *logrus.Logger) v1alpha1.WorkflowInterface {
-	if wfClient != nil {
-		return wfClient
+func InitWorkflowClient(cluster graphql.Cluster, inCluster bool, kubectlPath string, log *logrus.Logger) (v1alpha1.WorkflowInterface, kubernetes.Interface) {
+	if wfClient != nil && kubeClient != nil {
+		return wfClient, kubeClient
 	}
 	initKubeClient(inCluster, kubectlPath, log)
 	var namespace string
 	namespace = string(cluster.Name)
 	wfcs := wfclientset.NewForConfigOrDie(restConfig)
+	kubeClient = kubernetes.NewForConfigOrDie(restConfig)
 	wfClient = wfcs.ArgoprojV1alpha1().Workflows(namespace)
-	return wfClient.(v1alpha1.WorkflowInterface)
+	return wfClient.(v1alpha1.WorkflowInterface), kubeClient
 }
 
 // ansiFormat wraps ANSI escape codes to a string to format the string to a desired color.

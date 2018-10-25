@@ -7,7 +7,6 @@ import (
 )
 
 type cluster struct {
-	LogRegion    types.String
 	LogAwsKey    types.String
 	LogAwsSecret types.String
 }
@@ -28,8 +27,11 @@ type ScheduledBuild struct {
 
 //RunningBuild struct for running build info
 type RunningBuild struct {
-	ID      types.ID
-	Cluster cluster
+	ID        types.ID
+	Cluster   cluster
+	LogRegion types.String
+	StartedAt types.DateTime
+	Workflow  types.JSON
 }
 
 // BuildQuery query for builds
