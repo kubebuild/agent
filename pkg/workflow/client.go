@@ -72,11 +72,10 @@ func initKubeClient(kubectlPath string, log *logrus.Logger) *kubernetes.Clientse
 		clientConfig = clientcmd.NewDefaultClientConfig(config, overrides)
 		restConfig, err = clientConfig.ClientConfig()
 	} else {
-		// Config in cluster
-		restConfig, err = clientcmd.DefaultClientConfig.ClientConfig()
-	}
-	if err != nil {
-		log.Fatal(err)
+		restConfig, err = rest.InClusterConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// create the clientset

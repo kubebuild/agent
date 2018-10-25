@@ -94,10 +94,12 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 }
 
 func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, buildOps *util.SubmitOpts) {
+	uploadPipe := types.Boolean(true)
 	params := graphql.BuildMutationParams{
-		BuildID:      build.ID,
-		ClusterToken: b.cluster.Token,
-		State:        types.String(utils.Scheduled),
+		BuildID:        build.ID,
+		ClusterToken:   b.cluster.Token,
+		State:          types.String(utils.Scheduled),
+		UploadPipeline: &uploadPipe,
 	}
 	if build.PipeupWorkflow != nil {
 		wf := build.PipeupWorkflow.Workflow
@@ -108,8 +110,8 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 
 		params.PipeupWorkflow = &types.JSON{Workflow: newWf}
 		if util.IsWorkflowCompleted(newWf) {
-			boo := types.Boolean(false)
-			params.UploadPipeline = &boo
+			finishedPipe := types.Boolean(false)
+			params.UploadPipeline = &finishedPipe
 		}
 
 	} else {
