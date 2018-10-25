@@ -11,10 +11,9 @@ import (
 
 // Build labels
 var (
-	BuildIDLabel       = "kubebuild.com/build-id"
-	BuildNumberLabel   = "kubebuild.com/build-number"
-	BuildUploaderLabel = "kubebuild.com/is-uploader"
-	BuildBranchLabel   = "kubebuild.com/build-branch"
+	BuildIDLabel     = "kubebuild.com/build-id"
+	BuildNumberLabel = "kubebuild.com/build-number"
+	BuildBranchLabel = "kubebuild.com/build-branch"
 )
 
 // GetBuildOpts lol
@@ -47,7 +46,8 @@ func AddBuildLabels(build graphql.ScheduledBuild, isUploading bool, wf *wfv1.Wor
 
 	labels[BuildIDLabel] = build.ID.(string)
 	labels[BuildNumberLabel] = strconv.Itoa(int(build.BuildNumber))
-	labels[BuildUploaderLabel] = strconv.FormatBool(isUploading)
 	labels[BuildBranchLabel] = string(build.Branch)
 	wf.SetLabels(labels)
+	ttlWf := int32(2 * 60 * 60)
+	wf.Spec.TTLSecondsAfterFinished = &ttlWf
 }
