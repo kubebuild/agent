@@ -31,7 +31,7 @@ func (a *AgentUpdateScheduler) Start() {
 	utils.SetInterval(func() {
 		a.updateDeployment("kubebuild", true)
 		a.updateDeployment("kubebuild-launcher", false)
-	}, 5*1000, false)
+	}, 60*5*1000, false)
 }
 
 func (a *AgentUpdateScheduler) updateDeployment(deploymentSuffix string, updateArgs bool) error {
