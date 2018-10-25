@@ -54,6 +54,8 @@ func NewApp(config Configurer) (*App, error) {
 
 	buildScheduler := schedulers.NewBuildScheduler(app.WorkflowClient, app.GraphqlClient, app.KubeClient, app.Log)
 	app.Schedulers = append(app.Schedulers, buildScheduler)
+	agentUpdateScheduler := schedulers.NewAgentUpdateScheduler(app.KubeClient, app.GraphqlClient, app.Log)
+	app.Schedulers = append(app.Schedulers, agentUpdateScheduler)
 
 	return app, nil
 }
