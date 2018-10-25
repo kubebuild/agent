@@ -55,14 +55,14 @@ func initializeSession() {
 	}
 }
 
-func initKubeClient(inCluster bool, kubectlPath string, log *logrus.Logger) *kubernetes.Clientset {
+func initKubeClient(kubectlPath string, log *logrus.Logger) *kubernetes.Clientset {
 	if clientset != nil {
 		return clientset
 	}
 	var err error
 	var config clientcmdapi.Config
 
-	if !inCluster && kubectlPath != "" {
+	if kubectlPath != "" {
 		c, err := clientcmd.LoadFromFile(kubectlPath)
 		if err != nil {
 			log.Fatal(err)
@@ -88,11 +88,11 @@ func initKubeClient(inCluster bool, kubectlPath string, log *logrus.Logger) *kub
 }
 
 // InitWorkflowClient creates a new client for the Kubernetes Workflow CRD.
-func InitWorkflowClient(cluster graphql.Cluster, inCluster bool, kubectlPath string, log *logrus.Logger) (v1alpha1.WorkflowInterface, kubernetes.Interface) {
+func InitWorkflowClient(cluster graphql.Cluster, kubectlPath string, log *logrus.Logger) (v1alpha1.WorkflowInterface, kubernetes.Interface) {
 	if wfClient != nil && kubeClient != nil {
 		return wfClient, kubeClient
 	}
-	initKubeClient(inCluster, kubectlPath, log)
+	initKubeClient(kubectlPath, log)
 	var namespace string
 	namespace = string(cluster.Name)
 	wfcs := wfclientset.NewForConfigOrDie(restConfig)

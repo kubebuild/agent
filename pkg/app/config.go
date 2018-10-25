@@ -11,7 +11,6 @@ type Configurer interface {
 	GetLogLevel() logrus.Level
 	GetGraphqlURL() string
 	GetKubectlPath() string
-	GetInCluster() bool
 }
 
 // Config contains the base configuration fields required for the agent app.
@@ -21,18 +20,12 @@ type Config struct {
 	Token       string
 	LogLevel    string
 	GraphqlURL  string
-	InCluster   bool
 	KubectlPath string
 }
 
 // GetName app name.
 func (c *Config) GetName() string {
 	return c.Name
-}
-
-//GetInCluster app name.
-func (c *Config) GetInCluster() bool {
-	return c.InCluster
 }
 
 //GetKubectlPath app name.

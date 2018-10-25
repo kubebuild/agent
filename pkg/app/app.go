@@ -47,7 +47,7 @@ func NewApp(config Configurer) (*App, error) {
 	app.Log = logger
 	app.GraphqlClient = newGraphqlClient(config, app.Log)
 
-	wfClient, kubeClient := workflow.InitWorkflowClient(app.GraphqlClient.Cluster, config.GetInCluster(), config.GetKubectlPath(), logger)
+	wfClient, kubeClient := workflow.InitWorkflowClient(app.GraphqlClient.Cluster, config.GetKubectlPath(), logger)
 
 	app.KubeClient = kubeClient
 	app.WorkflowClient = wfClient
