@@ -18,10 +18,11 @@ type ScheduledBuild struct {
 	Branch         types.String
 	Commit         types.String
 	UploadPipeline types.Boolean
-	Template       types.WorkflowYaml
+	Template       *types.WorkflowYaml
+	PipeupWorkflow *types.JSON
 	Pipeline       struct {
 		GitURL        types.String
-		GitSecretName types.String
+		GitSecretName *types.String
 	}
 }
 

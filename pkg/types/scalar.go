@@ -85,6 +85,7 @@ func (w JSON) MarshalJSON() ([]byte, error) {
 // The template is yaml
 func (w *JSON) UnmarshalJSON(data []byte) error {
 	s, err := strconv.Unquote(string(data))
+
 	if err != nil {
 		return err
 	}

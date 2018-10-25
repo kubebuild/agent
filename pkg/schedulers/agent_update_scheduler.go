@@ -30,7 +30,7 @@ func NewAgentUpdateScheduler(kubeClient kubernetes.Interface, graphqlClient *gra
 func (a *AgentUpdateScheduler) Start() {
 	utils.SetInterval(func() {
 		a.updateDeployment("kubebuild", true)
-		a.updateDeployment("kubebuild-launcher", false)
+		a.updateDeployment("kubebuild-agent", false)
 	}, 60*5*1000, false)
 }
 

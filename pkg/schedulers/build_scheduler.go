@@ -1,7 +1,6 @@
 package schedulers
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -66,30 +65,11 @@ func (b *BuildScheduler) Start() {
 
 func (b *BuildScheduler) scheduleBuild(build graphql.ScheduledBuild) {
 	b.log.WithField("buildID", build.ID).Info("Schedule")
+	buildOps := GetBuildOpts(b.cluster, build)
 	if build.UploadPipeline {
-
+		b.buildWithUploadPipeline(build, buildOps)
 	} else {
-		wf := build.Template.Workflow
-		err := validate.ValidateWorkflow(wf, true)
-		if err != nil {
-			b.log.WithError(err).Error("Workflow failed validation")
-			// Todo set Error label ?
-		}
-		AddBuildLabels(build, false, wf)
-		buildOps := GetBuildOpts(b.cluster, build)
-		wfresult, _ := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
-		params := graphql.BuildMutationParams{
-			BuildID:      build.ID,
-			ClusterToken: b.cluster.Token,
-			State:        types.String(utils.Running),
-			Workflow:     &types.JSON{Workflow: wfresult},
-			StartedAt:    &types.DateTime{Time: time.Now().UTC()},
-		}
-		build, err := b.graphqlClient.UpdateClusterBuild(params)
-		if err != nil {
-			b.log.WithError(err).Error("Failed to update build")
-		}
-		b.log.WithField("buildID", build.ID).Info("updated")
+		b.scheduleBuildWithExistingWf(build, buildOps)
 	}
 }
 
@@ -113,20 +93,72 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	b.uploadLogs(newWf, build)
 }
 
+func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, buildOps *util.SubmitOpts) {
+	params := graphql.BuildMutationParams{
+		BuildID:      build.ID,
+		ClusterToken: b.cluster.Token,
+		State:        types.String(utils.Scheduled),
+	}
+	if build.PipeupWorkflow != nil {
+		wf := build.PipeupWorkflow.Workflow
+		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
+		if err != nil {
+			b.log.WithError(err).Error("cannot get wf")
+		}
+
+		params.PipeupWorkflow = &types.JSON{Workflow: newWf}
+		if util.IsWorkflowCompleted(newWf) {
+			boo := types.Boolean(false)
+			params.UploadPipeline = &boo
+		}
+
+	} else {
+		wf := b.createPipeUpTemplate(build)
+		pipeResultWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
+		if err != nil {
+			b.log.WithError(err).Error("pipe wf failed submit")
+		}
+		params.PipeupWorkflow = &types.JSON{Workflow: pipeResultWf}
+	}
+	b.graphqlClient.UpdateClusterBuild(params)
+}
+
+func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuild, buildOps *util.SubmitOpts) {
+	template := build.Template
+	if template == nil {
+		b.log.Error("template is nil canont continue")
+		return
+	}
+	wf := template.Workflow
+	err := validate.ValidateWorkflow(wf, true)
+	if err != nil {
+		b.log.WithError(err).Error("workflow failed validation")
+		// Todo set Error label ?
+	}
+	AddBuildLabels(build, false, wf)
+	wfresult, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
+	if err != nil {
+		b.log.WithError(err).Error("workflow failed submit")
+	}
+	params := graphql.BuildMutationParams{
+		BuildID:      build.ID,
+		ClusterToken: b.cluster.Token,
+		State:        types.String(utils.Running),
+		Workflow:     &types.JSON{Workflow: wfresult},
+		StartedAt:    &types.DateTime{Time: time.Now().UTC()},
+	}
+	buildWithID, err := b.graphqlClient.UpdateClusterBuild(params)
+	if err != nil {
+		b.log.WithError(err).Error("Failed to update build")
+	}
+	b.log.WithField("buildID", buildWithID.ID).Info("updated")
+}
+
 func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuild) {
 	metaTime := &metav1.Time{Time: build.StartedAt.Time}
 	logPrinter := workflow.NewLogPrinter(b.kubeClient, false, metaTime)
 
-	logEntries := logPrinter.PrintWorkflowLogs(wf)
-
-	bufferMap := make(map[string]bytes.Buffer)
-
-	for _, logEntry := range logEntries {
-		buffer := bufferMap[logEntry.Pod]
-		buffer.WriteString(logEntry.Line)
-		buffer.WriteString("\n")
-		bufferMap[logEntry.Pod] = buffer
-	}
+	bufferMap := logPrinter.GetWorkflowLogs(wf)
 
 	creds := credentials.Value{
 		AccessKeyID:     string(build.Cluster.LogAwsKey),
@@ -144,7 +176,7 @@ func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuil
 	for k, v := range bufferMap {
 
 		key := fmt.Sprintf("%s/%s/%s/main", b.cluster.Name, build.ID, k)
-		result, err := svc.Upload(&s3manager.UploadInput{
+		_, err := svc.Upload(&s3manager.UploadInput{
 			ACL:          aws.String("public-read"),
 			CacheControl: aws.String("no-cache"),
 			Expires:      aws.Time(time.Now().AddDate(0, 1, 0)),
@@ -156,6 +188,5 @@ func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuil
 		if err != nil {
 			b.log.WithError(err).Error("failed to upload logs")
 		}
-		b.log.Debug(result)
 	}
 }

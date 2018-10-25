@@ -46,6 +46,9 @@ func main() {
 	}
 	app.Action = func(c *cli.Context) {
 		token := c.String("token")
+		if token == "" {
+			token = os.Getenv("CLUSTER_TOKEN")
+		}
 		kubectlPath := c.String("kubectl-path")
 		logLevel := c.String("log-level")
 		version := c.App.Version

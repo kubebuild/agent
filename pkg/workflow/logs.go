@@ -2,10 +2,10 @@ package workflow
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"hash/fnv"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -47,6 +47,22 @@ type LogPrinter struct {
 	tail         *int64
 	timestamps   bool
 	kubeClient   kubernetes.Interface
+}
+
+//GetWorkflowLogs logs
+func (p *LogPrinter) GetWorkflowLogs(wf *v1alpha1.Workflow) map[string]bytes.Buffer {
+
+	logEntries := p.PrintWorkflowLogs(wf)
+
+	bufferMap := make(map[string]bytes.Buffer)
+
+	for _, logEntry := range logEntries {
+		buffer := bufferMap[logEntry.Pod]
+		buffer.WriteString(logEntry.Line)
+		buffer.WriteString("\n")
+		bufferMap[logEntry.Pod] = buffer
+	}
+	return bufferMap
 }
 
 // PrintWorkflowLogs prints logs for all workflow pods
@@ -244,14 +260,14 @@ func (p *LogPrinter) ensureContainerStarted(podName string, podNamespace string,
 
 func (p *LogPrinter) getPodLogs(
 	DisplayName string, podName string, podNamespace string, follow bool, tail *int64, sinceSeconds *int64, sinceTime *metav1.Time, callback func(entry LogEntry)) error {
-	err := p.ensureContainerStarted(podName, podNamespace, p.container, 10, time.Second)
+	err := p.ensureContainerStarted(podName, podNamespace, p.container, 2, time.Second)
 	if err != nil {
 		return err
 	}
 	stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
 		Container:    p.container,
 		Follow:       follow,
-		Timestamps:   true,
+		Timestamps:   false,
 		SinceSeconds: sinceSeconds,
 		SinceTime:    sinceTime,
 		TailLines:    tail,
@@ -260,21 +276,28 @@ func (p *LogPrinter) getPodLogs(
 		scanner := bufio.NewScanner(stream)
 		for scanner.Scan() {
 			line := scanner.Text()
-			parts := strings.Split(line, " ")
-			logTime, err := time.Parse(time.RFC3339, parts[0])
-			if err == nil {
-				lines := strings.Join(parts[1:], " ")
-				for _, line := range strings.Split(lines, "\r") {
-					if line != "" {
-						callback(LogEntry{
-							Pod:         podName,
-							DisplayName: DisplayName,
-							Time:        logTime,
-							Line:        line,
-						})
-					}
-				}
-			}
+
+			callback(LogEntry{
+				Pod:         podName,
+				DisplayName: DisplayName,
+				// Time:        logTime,
+				Line: line,
+			})
+			// parts := strings.Split(line, " ")
+			// logTime, err := time.Parse(time.RFC3339, parts[0])
+			// if err == nil {
+			// 	lines := strings.Join(parts[1:], " ")
+			// 	for _, line := range strings.Split(lines, "\r") {
+			// 		if line != "" {
+			// 			callback(LogEntry{
+			// 				Pod:         podName,
+			// 				DisplayName: DisplayName,
+			// 				Time:        logTime,
+			// 				Line:        line,
+			// 			})
+			// 		}
+			// 	}
+			// }
 		}
 	}
 	return err

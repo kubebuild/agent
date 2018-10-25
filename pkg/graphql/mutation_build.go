@@ -15,18 +15,19 @@ type updateBuilMutation struct {
 	UpdateClusterBuild struct {
 		Successful types.Boolean
 		Result     BuildWithID
-	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, logsFinalized: $logsFinalized)"`
+	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, pipeupWorkflow: $pipeupWorkflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, uploadPipeline: $uploadPipeline)"`
 }
 
 // BuildMutationParams some params for build mutation
 type BuildMutationParams struct {
-	BuildID       types.ID
-	ClusterToken  types.String
-	Workflow      *types.JSON `json:"omitempty"`
-	StartedAt     *types.DateTime
-	FinishedAt    *types.DateTime
-	State         types.String
-	LogsFinalized *types.Boolean
+	BuildID        types.ID
+	ClusterToken   types.String
+	Workflow       *types.JSON
+	StartedAt      *types.DateTime
+	FinishedAt     *types.DateTime
+	State          types.String
+	UploadPipeline *types.Boolean
+	PipeupWorkflow *types.JSON
 }
 
 //UpdateClusterBuild variations
@@ -40,13 +41,14 @@ func (m *Client) UpdateClusterBuild(params BuildMutationParams) (BuildWithID, er
 		params.FinishedAt = nil
 	}
 	variables := map[string]interface{}{
-		"buildId":       params.BuildID,
-		"clusterToken":  params.ClusterToken,
-		"workflow":      params.Workflow,
-		"state":         params.State,
-		"logsFinalized": params.LogsFinalized,
-		"startedAt":     params.StartedAt,
-		"finishedAt":    params.FinishedAt,
+		"buildId":        params.BuildID,
+		"clusterToken":   params.ClusterToken,
+		"workflow":       params.Workflow,
+		"state":          params.State,
+		"uploadPipeline": params.UploadPipeline,
+		"startedAt":      params.StartedAt,
+		"finishedAt":     params.FinishedAt,
+		"pipeupWorkflow": params.PipeupWorkflow,
 	}
 	err := m.GraphqlClient.Mutate(context.Background(), buildMutation, variables)
 	if err != nil {
