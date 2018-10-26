@@ -32,9 +32,13 @@ func getParams(cluster graphql.Cluster, build graphql.ScheduledBuild) []string {
 	buildNumber := fmt.Sprintf("buildNumber=%d", build.BuildNumber)
 	branch := fmt.Sprintf("branch=%s", build.Branch)
 	clusterToken := fmt.Sprintf("clusterToken=%s", cluster.Token)
-	gitSecretName := fmt.Sprintf("gitSecretName=%s", *build.Pipeline.GitSecretName)
+	params := []string{buildID, repo, revision, buildNumber, branch, clusterToken}
+	if build.Pipeline.GitSecretName != nil {
+		gitSecretName := fmt.Sprintf("gitSecretName=%s", *build.Pipeline.GitSecretName)
+		params = append(params, gitSecretName)
+	}
 
-	return []string{buildID, repo, revision, buildNumber, branch, clusterToken, gitSecretName}
+	return params
 }
 
 // AddBuildLabels adds the labels for the build

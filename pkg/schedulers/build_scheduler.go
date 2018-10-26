@@ -2,6 +2,7 @@ package schedulers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -185,7 +186,7 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 
 func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuild) {
 	metaTime := &metav1.Time{Time: build.StartedAt.Time}
-	logPrinter := workflow.NewLogPrinter(b.kubeClient, false, metaTime)
+	logPrinter := workflow.NewLogPrinter(b.kubeClient, b.log, false, metaTime)
 
 	bufferMap := logPrinter.GetWorkflowLogs(wf)
 
@@ -204,7 +205,10 @@ func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuil
 
 	for k, v := range bufferMap {
 
-		key := fmt.Sprintf("%s/%s/%s/main", b.cluster.Name, build.ID, k)
+		s := strings.Split(k, workflow.BufferDelim)
+		podName, container := s[0], s[1]
+
+		key := fmt.Sprintf("%s/%s/%s/%s", b.cluster.Name, build.ID, podName, container)
 		_, err := svc.Upload(&s3manager.UploadInput{
 			ACL:          aws.String("public-read"),
 			CacheControl: aws.String("no-cache"),

@@ -24,73 +24,51 @@ import (
 type LogEntry struct {
 	DisplayName string
 	Pod         string
+	Container   string
 	Time        time.Time
 	Line        string
 }
 
 // NewLogPrinter getlogs
-func NewLogPrinter(kubeClient kubernetes.Interface, follow bool, sinceTime *metav1.Time) *LogPrinter {
+func NewLogPrinter(kubeClient kubernetes.Interface, log *log.Logger, follow bool, sinceTime *metav1.Time) *LogPrinter {
 	return &LogPrinter{
 		kubeClient: kubeClient,
 		follow:     follow,
 		sinceTime:  sinceTime,
-		container:  "main",
+		log:        log,
 	}
 }
 
 // LogPrinter struct
 type LogPrinter struct {
-	container    string
 	follow       bool
 	sinceSeconds *int64
 	sinceTime    *metav1.Time
 	tail         *int64
 	timestamps   bool
 	kubeClient   kubernetes.Interface
+	log          *log.Logger
 }
+
+// BufferDelim used to delim container and pod
+var BufferDelim = "||"
 
 //GetWorkflowLogs logs
 func (p *LogPrinter) GetWorkflowLogs(wf *v1alpha1.Workflow) map[string]bytes.Buffer {
 
-	logEntries := p.PrintWorkflowLogs(wf)
+	logEntries := p.printRecentWorkflowLogs(wf)
 
 	bufferMap := make(map[string]bytes.Buffer)
 
 	for _, logEntry := range logEntries {
-		buffer := bufferMap[logEntry.Pod]
+		bufferKey := fmt.Sprintf("%s%s%s", logEntry.Pod, BufferDelim, logEntry.Container)
+		buffer := bufferMap[bufferKey]
 		buffer.WriteString(logEntry.Line)
 		buffer.WriteString("\n")
-		bufferMap[logEntry.Pod] = buffer
+		bufferMap[bufferKey] = buffer
 	}
+
 	return bufferMap
-}
-
-// PrintWorkflowLogs prints logs for all workflow pods
-func (p *LogPrinter) PrintWorkflowLogs(wf *v1alpha1.Workflow) []LogEntry {
-	logEntries := p.printRecentWorkflowLogs(wf)
-	// if p.follow && wf.Status.Phase == v1alpha1.NodeRunning {
-	// 	p.printLiveWorkflowLogs(wf, timeByPod)
-	// }
-	return logEntries
-}
-
-// PrintPodLogs prints logs for a single pod
-func (p *LogPrinter) PrintPodLogs(podName string) error {
-	namespace, _, err := clientConfig.Namespace()
-	if err != nil {
-		return err
-	}
-	var logs []LogEntry
-	err = p.getPodLogs("", podName, namespace, p.follow, p.tail, p.sinceSeconds, p.sinceTime, func(entry LogEntry) {
-		logs = append(logs, entry)
-	})
-	if err != nil {
-		return err
-	}
-	for _, entry := range logs {
-		p.printLogEntry(entry)
-	}
-	return nil
 }
 
 // Prints logs for workflow pod steps and return most recent log timestamp per pod name
@@ -116,7 +94,7 @@ func (p *LogPrinter) printRecentWorkflowLogs(wf *v1alpha1.Workflow) []LogEntry {
 			})
 
 			if err != nil {
-				log.Warn(err)
+				p.log.Warn(err)
 				return
 			}
 
@@ -184,7 +162,7 @@ func (p *LogPrinter) printLiveWorkflowLogs(workflow *v1alpha1.Workflow, timeByPo
 						logs <- entry
 					})
 					if err != nil {
-						log.Warn(err)
+						p.log.Warn(err)
 					}
 				}()
 			}
@@ -260,44 +238,38 @@ func (p *LogPrinter) ensureContainerStarted(podName string, podNamespace string,
 
 func (p *LogPrinter) getPodLogs(
 	DisplayName string, podName string, podNamespace string, follow bool, tail *int64, sinceSeconds *int64, sinceTime *metav1.Time, callback func(entry LogEntry)) error {
-	err := p.ensureContainerStarted(podName, podNamespace, p.container, 2, time.Second)
+	pod, err := p.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
-		Container:    p.container,
-		Follow:       follow,
-		Timestamps:   false,
-		SinceSeconds: sinceSeconds,
-		SinceTime:    sinceTime,
-		TailLines:    tail,
-	}).Stream()
-	if err == nil {
-		scanner := bufio.NewScanner(stream)
-		for scanner.Scan() {
-			line := scanner.Text()
 
-			callback(LogEntry{
-				Pod:         podName,
-				DisplayName: DisplayName,
-				// Time:        logTime,
-				Line: line,
-			})
-			// parts := strings.Split(line, " ")
-			// logTime, err := time.Parse(time.RFC3339, parts[0])
-			// if err == nil {
-			// 	lines := strings.Join(parts[1:], " ")
-			// 	for _, line := range strings.Split(lines, "\r") {
-			// 		if line != "" {
-			// 			callback(LogEntry{
-			// 				Pod:         podName,
-			// 				DisplayName: DisplayName,
-			// 				Time:        logTime,
-			// 				Line:        line,
-			// 			})
-			// 		}
-			// 	}
-			// }
+	for _, container := range pod.Spec.Containers {
+
+		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 2, time.Second)
+		if err != nil {
+			return err
+		}
+		stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
+			Container:    container.Name,
+			Follow:       follow,
+			Timestamps:   false,
+			SinceSeconds: sinceSeconds,
+			SinceTime:    sinceTime,
+			TailLines:    tail,
+		}).Stream()
+		if err == nil {
+			scanner := bufio.NewScanner(stream)
+			for scanner.Scan() {
+				line := scanner.Text()
+
+				callback(LogEntry{
+					Pod:         podName,
+					DisplayName: DisplayName,
+					Container:   container.Name,
+					// Time:        logTime,
+					Line: line,
+				})
+			}
 		}
 	}
 	return err
