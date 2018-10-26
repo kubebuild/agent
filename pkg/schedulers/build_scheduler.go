@@ -165,7 +165,7 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 		b.log.WithError(err).Error("workflow failed validation")
 		// Todo set Error label ?
 	}
-	AddBuildLabels(build, false, wf)
+	AddBuildLabels(build, wf)
 	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")

@@ -11,10 +11,8 @@ import (
 
 // Build labels
 var (
-	BuildIDLabel       = "kubebuild.com/build-id"
-	BuildNumberLabel   = "kubebuild.com/build-number"
-	BuildUploaderLabel = "kubebuild.com/is-uploader"
-	BuildBranchLabel   = "kubebuild.com/build-branch"
+	BuildIDLabel     = "kubebuild.com/build-id"
+	BuildNumberLabel = "kubebuild.com/build-number"
 )
 
 // GetBuildOpts lol
@@ -40,7 +38,7 @@ func getParams(cluster graphql.Cluster, build graphql.ScheduledBuild) []string {
 }
 
 // AddBuildLabels adds the labels for the build
-func AddBuildLabels(build graphql.ScheduledBuild, isUploading bool, wf *wfv1.Workflow) {
+func AddBuildLabels(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 	labels := wf.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
@@ -48,8 +46,6 @@ func AddBuildLabels(build graphql.ScheduledBuild, isUploading bool, wf *wfv1.Wor
 
 	labels[BuildIDLabel] = build.ID.(string)
 	labels[BuildNumberLabel] = strconv.Itoa(int(build.BuildNumber))
-	labels[BuildUploaderLabel] = strconv.FormatBool(isUploading)
-	labels[BuildBranchLabel] = string(build.Branch)
 	wf.SetLabels(labels)
 	ttlWf := int32(2 * 60 * 60)
 	wf.Spec.TTLSecondsAfterFinished = &ttlWf

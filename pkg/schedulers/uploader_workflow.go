@@ -60,7 +60,7 @@ func (b *BuildScheduler) createPipeUpTemplate(build graphql.ScheduledBuild) *wfv
 		},
 		Spec: spec,
 	}
-	AddBuildLabels(build, true, wf)
+	AddBuildLabels(build, wf)
 
 	return wf
 }
