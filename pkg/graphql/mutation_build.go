@@ -15,19 +15,20 @@ type updateBuilMutation struct {
 	UpdateClusterBuild struct {
 		Successful types.Boolean
 		Result     BuildWithID
-	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, pipeupWorkflow: $pipeupWorkflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, uploadPipeline: $uploadPipeline)"`
+	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, pipeupWorkflow: $pipeupWorkflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, uploadPipeline: $uploadPipeline, resumeSuspended: $resumeSuspended)"`
 }
 
 // BuildMutationParams some params for build mutation
 type BuildMutationParams struct {
-	BuildID        types.ID
-	ClusterToken   types.String
-	Workflow       *types.JSON
-	StartedAt      *types.DateTime
-	FinishedAt     *types.DateTime
-	State          types.String
-	UploadPipeline *types.Boolean
-	PipeupWorkflow *types.JSON
+	BuildID         types.ID
+	ClusterToken    types.String
+	Workflow        *types.JSON
+	StartedAt       *types.DateTime
+	FinishedAt      *types.DateTime
+	State           types.String
+	UploadPipeline  *types.Boolean
+	ResumeSuspended *types.Boolean
+	PipeupWorkflow  *types.JSON
 }
 
 //UpdateClusterBuild variations
@@ -41,14 +42,15 @@ func (m *Client) UpdateClusterBuild(params BuildMutationParams) (BuildWithID, er
 		params.FinishedAt = nil
 	}
 	variables := map[string]interface{}{
-		"buildId":        params.BuildID,
-		"clusterToken":   params.ClusterToken,
-		"workflow":       params.Workflow,
-		"state":          params.State,
-		"uploadPipeline": params.UploadPipeline,
-		"startedAt":      params.StartedAt,
-		"finishedAt":     params.FinishedAt,
-		"pipeupWorkflow": params.PipeupWorkflow,
+		"buildId":         params.BuildID,
+		"clusterToken":    params.ClusterToken,
+		"workflow":        params.Workflow,
+		"state":           params.State,
+		"uploadPipeline":  params.UploadPipeline,
+		"startedAt":       params.StartedAt,
+		"finishedAt":      params.FinishedAt,
+		"pipeupWorkflow":  params.PipeupWorkflow,
+		"resumeSuspended": params.ResumeSuspended,
 	}
 	err := m.GraphqlClient.Mutate(context.Background(), buildMutation, variables)
 	if err != nil {

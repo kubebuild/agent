@@ -58,7 +58,7 @@ func (b *BuildScheduler) Start() {
 			b.runningBuild(build)
 		}
 		for _, build := range result.Blocked {
-			b.log.Debug(build)
+			b.resumeSuspended(build)
 		}
 	}, 2000, false)
 }
@@ -73,6 +73,15 @@ func (b *BuildScheduler) scheduleBuild(build graphql.ScheduledBuild) {
 	}
 }
 
+func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
+	return graphql.BuildMutationParams{
+		BuildID:      buildID,
+		Workflow:     &types.JSON{Workflow: wf},
+		ClusterToken: b.cluster.Token,
+		State:        utils.MapPhaseToState(wf.Status.Phase, false),
+	}
+}
+
 func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	b.log.Info("Running")
 	wf := build.Workflow.Workflow
@@ -80,17 +89,36 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	if err != nil {
 		b.log.WithError(err).Error("cannot get wf")
 	}
-	params := graphql.BuildMutationParams{
-		BuildID:      build.ID,
-		Workflow:     &types.JSON{Workflow: newWf},
-		ClusterToken: b.cluster.Token,
-		State:        utils.MapPhaseToState(newWf.Status.Phase, false),
+	params := b.defaultParams(build.ID, newWf)
+	if util.IsWorkflowSuspended(newWf) {
+		params.State = utils.MapPhaseToState(newWf.Status.Phase, true)
+		params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
 	}
 	if util.IsWorkflowCompleted(newWf) {
-		params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
+		params.FinishedAt = &types.DateTime{Time: newWf.Status.FinishedAt.Time.UTC()}
 	}
 	b.graphqlClient.UpdateClusterBuild(params)
 	b.uploadLogs(newWf, build)
+}
+
+func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
+	if build.ResumeSuspended {
+		b.log.WithField("buildID", build.ID).Info("resuming build")
+		wf := build.Workflow.Workflow
+		err := util.ResumeWorkflow(b.workflowClient, wf.GetName())
+		if err != nil {
+			b.log.WithError(err).Error("could not resume build")
+		}
+		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
+		if err != nil {
+			b.log.WithError(err).Error("cannot get wf")
+		}
+		params := b.defaultParams(build.ID, newWf)
+		if util.IsWorkflowCompleted(newWf) {
+			params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
+		}
+		b.graphqlClient.UpdateClusterBuild(params)
+	}
 }
 
 func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, buildOps *util.SubmitOpts) {
@@ -138,17 +166,14 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 		// Todo set Error label ?
 	}
 	AddBuildLabels(build, false, wf)
-	wfresult, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
+	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")
 	}
-	params := graphql.BuildMutationParams{
-		BuildID:      build.ID,
-		ClusterToken: b.cluster.Token,
-		State:        types.String(utils.Running),
-		Workflow:     &types.JSON{Workflow: wfresult},
-		StartedAt:    &types.DateTime{Time: time.Now().UTC()},
-	}
+	params := b.defaultParams(build.ID, newWf)
+	params.State = types.String(utils.Running)
+	params.StartedAt = &types.DateTime{Time: time.Now().UTC()}
+
 	buildWithID, err := b.graphqlClient.UpdateClusterBuild(params)
 	if err != nil {
 		b.log.WithError(err).Error("Failed to update build")

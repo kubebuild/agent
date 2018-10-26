@@ -38,7 +38,6 @@ type RunningBuild struct {
 //BlockedBuild to resume suspended
 type BlockedBuild struct {
 	ID              types.ID
-	FinishedAt      types.DateTime
 	ResumeSuspended types.Boolean
 	Workflow        types.JSON
 }
