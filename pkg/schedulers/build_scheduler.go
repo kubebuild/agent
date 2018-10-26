@@ -90,6 +90,7 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 		b.log.WithError(err).Error("cannot get wf")
 	}
 	params := b.defaultParams(build.ID, newWf)
+	params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
 	if util.IsWorkflowSuspended(newWf) {
 		params.State = utils.MapPhaseToState(newWf.Status.Phase, true)
 		params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
@@ -114,6 +115,7 @@ func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
 			b.log.WithError(err).Error("cannot get wf")
 		}
 		params := b.defaultParams(build.ID, newWf)
+		params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
 		if util.IsWorkflowCompleted(newWf) {
 			params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
 		}

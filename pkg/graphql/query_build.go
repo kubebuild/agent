@@ -40,6 +40,7 @@ type BlockedBuild struct {
 	ID              types.ID
 	ResumeSuspended types.Boolean
 	Workflow        types.JSON
+	StartedAt       types.DateTime
 }
 
 // BuildQuery query for builds
