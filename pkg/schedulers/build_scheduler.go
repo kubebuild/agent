@@ -100,7 +100,7 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 		params.FinishedAt = &types.DateTime{Time: newWf.Status.FinishedAt.Time.UTC()}
 	}
 	b.graphqlClient.UpdateClusterBuild(params)
-	b.uploadLogs(newWf, build)
+	go b.uploadLogs(newWf, build)
 }
 
 func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
