@@ -1,7 +1,10 @@
 package schedulers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"time"
 
@@ -207,15 +210,30 @@ func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuil
 
 		s := strings.Split(k, workflow.BufferDelim)
 		podName, container := s[0], s[1]
+		var gZipBuffer bytes.Buffer
+
+		w := gzip.NewWriter(&gZipBuffer)
+		bytes, err := ioutil.ReadAll(&v)
+		if err != nil {
+			b.log.WithError(err).Error("cannot read buffer")
+		}
+		_, err = w.Write(bytes)
+
+		if err != nil {
+			b.log.WithError(err).Error("cannot gzip file")
+		}
+		w.Close()
 
 		key := fmt.Sprintf("%s/%s/%s/%s", b.cluster.Name, build.ID, podName, container)
-		_, err := svc.Upload(&s3manager.UploadInput{
-			ACL:          aws.String("public-read"),
-			CacheControl: aws.String("no-cache"),
-			Expires:      aws.Time(time.Now().AddDate(0, 1, 0)),
-			Bucket:       aws.String(bucket),
-			Key:          aws.String(key),
-			Body:         &v,
+		_, err = svc.Upload(&s3manager.UploadInput{
+			ACL:             aws.String("public-read"),
+			CacheControl:    aws.String("no-cache"),
+			ContentType:     aws.String("text/plain; charset=utf-8"),
+			ContentEncoding: aws.String("gzip"),
+			Expires:         aws.Time(time.Now().AddDate(0, 1, 0)),
+			Bucket:          aws.String(bucket),
+			Key:             aws.String(key),
+			Body:            &gZipBuffer,
 		})
 
 		if err != nil {
