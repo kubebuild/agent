@@ -1,6 +1,7 @@
 package schedulers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/kubebuild/agent/pkg/workflow"
@@ -27,6 +28,8 @@ type BuildScheduler struct {
 	kubeClient     kubernetes.Interface
 	logUploader    *workflow.LogUploader
 }
+
+var shaMap = make(map[string]map[string]string)
 
 // NewBuildScheduler schedule builds
 func NewBuildScheduler(workflowClient v1alpha1.WorkflowInterface, graphqlClient *graphql.Client, kubeClient kubernetes.Interface, log *logrus.Logger) *BuildScheduler {
@@ -96,8 +99,15 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	if util.IsWorkflowCompleted(newWf) {
 		params.FinishedAt = &types.DateTime{Time: newWf.Status.FinishedAt.Time.UTC()}
 	}
+	buildID := fmt.Sprintf("%s", build.ID)
+	if shaMap[buildID] == nil {
+		shaMap[buildID] = make(map[string]string)
+	}
 	b.graphqlClient.UpdateClusterBuild(params)
-	go b.logUploader.UploadWorkflowLogs(newWf, build)
+	go b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID])
+	if util.IsWorkflowCompleted(newWf) {
+		delete(shaMap, buildID)
+	}
 }
 
 func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {

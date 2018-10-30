@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -52,71 +54,80 @@ type LogUploader struct {
 var BufferDelim = "||"
 
 // UploadWorkflowLogs upload wf logs
-func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.RunningBuild) {
+func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.RunningBuild, shaMap map[string]string) {
 	var requestGroup singleflight.Group
-	buildID := fmt.Sprintf("%s", build.ID)
 
-	ch := requestGroup.DoChan(buildID, func() (interface{}, error) {
-		var uploadOutput *s3manager.UploadOutput
-		var err error
-		bufferMap := p.GetWorkflowLogs(wf)
+	bufferMap := p.GetWorkflowLogs(wf)
 
-		creds := credentials.Value{
-			AccessKeyID:     string(build.Cluster.LogAwsKey),
-			SecretAccessKey: string(build.Cluster.LogAwsSecret),
+	creds := credentials.Value{
+		AccessKeyID:     string(build.Cluster.LogAwsKey),
+		SecretAccessKey: string(build.Cluster.LogAwsSecret),
+	}
+
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String(string(build.LogRegion)),
+		Credentials: credentials.NewStaticCredentialsFromCreds(creds),
+	}))
+
+	bucket := fmt.Sprintf("kubebuild-logs-%s", build.LogRegion)
+	svc := s3manager.NewUploader(sess)
+
+	for k, v := range bufferMap {
+		readBytes, err := ioutil.ReadAll(&v)
+		if err != nil {
+			p.log.WithError(err).Error("cannot read buffer")
 		}
+		h := sha256.New()
 
-		sess := session.Must(session.NewSession(&aws.Config{
-			Region:      aws.String(string(build.LogRegion)),
-			Credentials: credentials.NewStaticCredentialsFromCreds(creds),
-		}))
+		h.Write(readBytes)
+		bs := hex.EncodeToString(h.Sum(nil))
 
-		bucket := fmt.Sprintf("kubebuild-logs-%s", build.LogRegion)
-		svc := s3manager.NewUploader(sess)
-
-		for k, v := range bufferMap {
-
-			s := strings.Split(k, BufferDelim)
-			podName, container := s[0], s[1]
-			var gZipBuffer bytes.Buffer
-
-			w := gzip.NewWriter(&gZipBuffer)
-			bytes, err := ioutil.ReadAll(&v)
-			if err != nil {
-				p.log.WithError(err).Error("cannot read buffer")
-			}
-			_, err = w.Write(bytes)
-
-			if err != nil {
-				p.log.WithError(err).Error("cannot gzip file")
-			}
-			w.Close()
-
-			key := fmt.Sprintf("%s/%s/%s/%s", p.cluster.Name, build.ID, podName, container)
-			uploadOutput, err = svc.Upload(&s3manager.UploadInput{
-				ACL:             aws.String("public-read"),
-				CacheControl:    aws.String("no-cache"),
-				ContentType:     aws.String("text/plain; charset=utf-8"),
-				ContentEncoding: aws.String("gzip"),
-				Expires:         aws.Time(time.Now().AddDate(0, 1, 0)),
-				Bucket:          aws.String(bucket),
-				Key:             aws.String(key),
-				Body:            &gZipBuffer,
-			})
-
-			if err != nil {
-				p.log.WithError(err).Error("failed to upload logs")
-			}
+		if shaMap[k] == bs {
+			p.log.WithField("container", k).Debug("skipping same shas")
+			continue
 		}
-		return uploadOutput, err
+		shaMap[k] = bs
+
+		requestGroup.Do(k, func() (interface{}, error) {
+			return p.uploadToS3(k, svc, build, readBytes, bucket)
+		})
+		if err != nil {
+			p.log.WithError(err).Error("channel failed")
+		}
+	}
+}
+
+func (p *LogUploader) uploadToS3(k string, svc *s3manager.Uploader, build graphql.RunningBuild, readBytes []byte, bucket string) (*s3manager.UploadOutput, error) {
+	s := strings.Split(k, BufferDelim)
+	podName, container := s[0], s[1]
+	var gZipBuffer bytes.Buffer
+
+	w := gzip.NewWriter(&gZipBuffer)
+	_, err := w.Write(readBytes)
+
+	if err != nil {
+		p.log.WithError(err).Error("cannot gzip file")
+	}
+	w.Close()
+
+	key := fmt.Sprintf("%s/%s/%s/%s", p.cluster.Name, build.ID, podName, container)
+	uploadOutput, err := svc.Upload(&s3manager.UploadInput{
+		ACL:             aws.String("public-read"),
+		CacheControl:    aws.String("no-cache"),
+		ContentType:     aws.String("text/plain; charset=utf-8"),
+		ContentEncoding: aws.String("gzip"),
+		Expires:         aws.Time(time.Now().AddDate(0, 1, 0)),
+		Bucket:          aws.String(bucket),
+		Key:             aws.String(key),
+		Body:            &gZipBuffer,
 	})
 
-	var result singleflight.Result
-	result = <-ch
-	if result.Err != nil {
-		p.log.WithError(result.Err).Error("cannot get logs")
+	if err != nil {
+		p.log.WithError(err).Error("failed to upload logs")
 	}
-	p.log.Debug(result.Val)
+	p.log.Debug(uploadOutput)
+	return uploadOutput, err
+
 }
 
 //GetWorkflowLogs logs
@@ -217,7 +228,7 @@ func (p *LogUploader) getPodLogs(
 
 	for _, container := range pod.Spec.Containers {
 
-		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 3, time.Second)
+		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 1, time.Second)
 
 		if err != nil {
 			return err
