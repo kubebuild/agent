@@ -3,21 +3,24 @@ package workflow
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"fmt"
-	"hash/fnv"
-	"math"
+	"io/ioutil"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
-	wfclientset "github.com/argoproj/argo/pkg/client/clientset/versioned"
-	wfinformers "github.com/argoproj/argo/pkg/client/informers/externalversions"
-	"github.com/argoproj/pkg/errors"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/kubebuild/agent/pkg/graphql"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 // LogEntry struct
@@ -29,34 +32,97 @@ type LogEntry struct {
 	Line        string
 }
 
-// NewLogPrinter getlogs
-func NewLogPrinter(kubeClient kubernetes.Interface, log *log.Logger, follow bool, sinceTime *metav1.Time) *LogPrinter {
-	return &LogPrinter{
+// NewLogUploader getlogs
+func NewLogUploader(cluster graphql.Cluster, kubeClient kubernetes.Interface, log *log.Logger) *LogUploader {
+	return &LogUploader{
 		kubeClient: kubeClient,
-		follow:     follow,
-		sinceTime:  sinceTime,
 		log:        log,
+		cluster:    cluster,
 	}
 }
 
-// LogPrinter struct
-type LogPrinter struct {
-	follow       bool
-	sinceSeconds *int64
-	sinceTime    *metav1.Time
-	tail         *int64
-	timestamps   bool
-	kubeClient   kubernetes.Interface
-	log          *log.Logger
+// LogUploader struct
+type LogUploader struct {
+	kubeClient kubernetes.Interface
+	log        *log.Logger
+	cluster    graphql.Cluster
 }
 
 // BufferDelim used to delim container and pod
 var BufferDelim = "||"
 
-//GetWorkflowLogs logs
-func (p *LogPrinter) GetWorkflowLogs(wf *v1alpha1.Workflow) map[string]bytes.Buffer {
+// UploadWorkflowLogs upload wf logs
+func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.RunningBuild) {
+	var requestGroup singleflight.Group
+	buildID := fmt.Sprintf("%s", build.ID)
 
-	logEntries := p.printRecentWorkflowLogs(wf)
+	ch := requestGroup.DoChan(buildID, func() (interface{}, error) {
+		var uploadOutput *s3manager.UploadOutput
+		var err error
+		bufferMap := p.GetWorkflowLogs(wf)
+
+		creds := credentials.Value{
+			AccessKeyID:     string(build.Cluster.LogAwsKey),
+			SecretAccessKey: string(build.Cluster.LogAwsSecret),
+		}
+
+		sess := session.Must(session.NewSession(&aws.Config{
+			Region:      aws.String(string(build.LogRegion)),
+			Credentials: credentials.NewStaticCredentialsFromCreds(creds),
+		}))
+
+		bucket := fmt.Sprintf("kubebuild-logs-%s", build.LogRegion)
+		svc := s3manager.NewUploader(sess)
+
+		for k, v := range bufferMap {
+
+			s := strings.Split(k, BufferDelim)
+			podName, container := s[0], s[1]
+			var gZipBuffer bytes.Buffer
+
+			w := gzip.NewWriter(&gZipBuffer)
+			bytes, err := ioutil.ReadAll(&v)
+			if err != nil {
+				p.log.WithError(err).Error("cannot read buffer")
+			}
+			_, err = w.Write(bytes)
+
+			if err != nil {
+				p.log.WithError(err).Error("cannot gzip file")
+			}
+			w.Close()
+
+			key := fmt.Sprintf("%s/%s/%s/%s", p.cluster.Name, build.ID, podName, container)
+			uploadOutput, err = svc.Upload(&s3manager.UploadInput{
+				ACL:             aws.String("public-read"),
+				CacheControl:    aws.String("no-cache"),
+				ContentType:     aws.String("text/plain; charset=utf-8"),
+				ContentEncoding: aws.String("gzip"),
+				Expires:         aws.Time(time.Now().AddDate(0, 1, 0)),
+				Bucket:          aws.String(bucket),
+				Key:             aws.String(key),
+				Body:            &gZipBuffer,
+			})
+
+			if err != nil {
+				p.log.WithError(err).Error("failed to upload logs")
+			}
+		}
+		return uploadOutput, err
+	})
+
+	var result singleflight.Result
+	result = <-ch
+	if result.Err != nil {
+		p.log.WithError(result.Err).Error("cannot get logs")
+	}
+	p.log.Debug(result.Val)
+}
+
+//GetWorkflowLogs logs
+func (p *LogUploader) GetWorkflowLogs(wf *v1alpha1.Workflow) map[string]bytes.Buffer {
+
+	logEntries := p.getRecentWfLogs(wf)
 
 	bufferMap := make(map[string]bytes.Buffer)
 
@@ -72,7 +138,7 @@ func (p *LogPrinter) GetWorkflowLogs(wf *v1alpha1.Workflow) map[string]bytes.Buf
 }
 
 // Prints logs for workflow pod steps and return most recent log timestamp per pod name
-func (p *LogPrinter) printRecentWorkflowLogs(wf *v1alpha1.Workflow) []LogEntry {
+func (p *LogUploader) getRecentWfLogs(wf *v1alpha1.Workflow) []LogEntry {
 	var podNodes []v1alpha1.NodeStatus
 	for _, node := range wf.Status.Nodes {
 		if node.Type == v1alpha1.NodeTypePod && node.Phase != v1alpha1.NodeError {
@@ -89,7 +155,7 @@ func (p *LogPrinter) printRecentWorkflowLogs(wf *v1alpha1.Workflow) []LogEntry {
 		go func() {
 			defer wg.Done()
 			var podLogs []LogEntry
-			err := p.getPodLogs(getDisplayName(node), node.ID, wf.Namespace, false, p.tail, p.sinceSeconds, p.sinceTime, func(entry LogEntry) {
+			err := p.getPodLogs(getDisplayName(node), node.ID, wf.Namespace, func(entry LogEntry) {
 				podLogs = append(podLogs, entry)
 			})
 
@@ -108,85 +174,7 @@ func (p *LogPrinter) printRecentWorkflowLogs(wf *v1alpha1.Workflow) []LogEntry {
 
 	flattenLogs := mergeSorted(logs)
 
-	if p.tail != nil {
-		tail := *p.tail
-		if int64(len(flattenLogs)) < tail {
-			tail = int64(len(flattenLogs))
-		}
-		flattenLogs = flattenLogs[0:tail]
-	}
 	return flattenLogs
-}
-
-func (p *LogPrinter) setupWorkflowInformer(namespace string, name string, callback func(wf *v1alpha1.Workflow, done bool)) cache.SharedIndexInformer {
-	wfcClientset := wfclientset.NewForConfigOrDie(restConfig)
-	wfInformerFactory := wfinformers.NewFilteredSharedInformerFactory(wfcClientset, 20*time.Minute, namespace, nil)
-	informer := wfInformerFactory.Argoproj().V1alpha1().Workflows().Informer()
-	informer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(old, new interface{}) {
-				updatedWf := new.(*v1alpha1.Workflow)
-				if updatedWf.Name == name {
-					callback(updatedWf, updatedWf.Status.Phase != v1alpha1.NodeRunning)
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				deletedWf := obj.(*v1alpha1.Workflow)
-				if deletedWf.Name == name {
-					callback(deletedWf, true)
-				}
-			},
-		},
-	)
-	return informer
-}
-
-// Prints live logs for workflow pods, starting from time specified in timeByPod name.
-func (p *LogPrinter) printLiveWorkflowLogs(workflow *v1alpha1.Workflow, timeByPod map[string]*time.Time) {
-	logs := make(chan LogEntry)
-	streamedPods := make(map[string]bool)
-
-	processPods := func(wf *v1alpha1.Workflow) {
-		for id := range wf.Status.Nodes {
-			node := wf.Status.Nodes[id]
-			if node.Type == v1alpha1.NodeTypePod && node.Phase != v1alpha1.NodeError && streamedPods[node.ID] == false {
-				streamedPods[node.ID] = true
-				go func() {
-					var sinceTimePtr *metav1.Time
-					podTime := timeByPod[node.ID]
-					if podTime != nil {
-						sinceTime := metav1.NewTime(podTime.Add(time.Second))
-						sinceTimePtr = &sinceTime
-					}
-					err := p.getPodLogs(getDisplayName(node), node.ID, wf.Namespace, true, nil, nil, sinceTimePtr, func(entry LogEntry) {
-						logs <- entry
-					})
-					if err != nil {
-						p.log.Warn(err)
-					}
-				}()
-			}
-		}
-	}
-
-	processPods(workflow)
-	informer := p.setupWorkflowInformer(workflow.Namespace, workflow.Name, func(wf *v1alpha1.Workflow, done bool) {
-		if done {
-			close(logs)
-		} else {
-			processPods(wf)
-		}
-	})
-
-	stopChannel := make(chan struct{})
-	go func() {
-		informer.Run(stopChannel)
-	}()
-	defer close(stopChannel)
-
-	for entry := range logs {
-		p.printLogEntry(entry)
-	}
 }
 
 func getDisplayName(node v1alpha1.NodeStatus) string {
@@ -197,23 +185,7 @@ func getDisplayName(node v1alpha1.NodeStatus) string {
 	return res
 }
 
-func (p *LogPrinter) printLogEntry(entry LogEntry) {
-	line := entry.Line
-	if p.timestamps {
-		line = entry.Time.Format(time.RFC3339) + "	" + line
-	}
-	if entry.DisplayName != "" {
-		colors := []int{FgRed, FgGreen, FgYellow, FgBlue, FgMagenta, FgCyan, FgWhite, FgDefault}
-		h := fnv.New32a()
-		_, err := h.Write([]byte(entry.DisplayName))
-		errors.CheckError(err)
-		colorIndex := int(math.Mod(float64(h.Sum32()), float64(len(colors))))
-		line = ansiFormat(entry.DisplayName, colors[colorIndex]) + ":	" + line
-	}
-	fmt.Println(line)
-}
-
-func (p *LogPrinter) ensureContainerStarted(podName string, podNamespace string, container string, retryCnt int, retryTimeout time.Duration) error {
+func (p *LogUploader) ensureContainerStarted(podName string, podNamespace string, container string, retryCnt int, retryTimeout time.Duration) error {
 	for retryCnt > 0 {
 		pod, err := p.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
 		if err != nil {
@@ -236,8 +208,8 @@ func (p *LogPrinter) ensureContainerStarted(podName string, podNamespace string,
 	return fmt.Errorf("container '%s' of pod '%s' has not started within expected timeout", container, podName)
 }
 
-func (p *LogPrinter) getPodLogs(
-	DisplayName string, podName string, podNamespace string, follow bool, tail *int64, sinceSeconds *int64, sinceTime *metav1.Time, callback func(entry LogEntry)) error {
+func (p *LogUploader) getPodLogs(
+	DisplayName string, podName string, podNamespace string, callback func(entry LogEntry)) error {
 	pod, err := p.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -245,18 +217,17 @@ func (p *LogPrinter) getPodLogs(
 
 	for _, container := range pod.Spec.Containers {
 
-		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 2, time.Second)
+		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 3, time.Second)
+
 		if err != nil {
 			return err
 		}
+
 		stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
-			Container:    container.Name,
-			Follow:       follow,
-			Timestamps:   false,
-			SinceSeconds: sinceSeconds,
-			SinceTime:    sinceTime,
-			TailLines:    tail,
+			Container:  container.Name,
+			Timestamps: false,
 		}).Stream()
+
 		if err == nil {
 			scanner := bufio.NewScanner(stream)
 			for scanner.Scan() {
@@ -266,8 +237,7 @@ func (p *LogPrinter) getPodLogs(
 					Pod:         podName,
 					DisplayName: DisplayName,
 					Container:   container.Name,
-					// Time:        logTime,
-					Line: line,
+					Line:        line,
 				})
 			}
 		}

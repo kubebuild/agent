@@ -18,7 +18,7 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:d81cb433187865438de69e871488e4fc6398f900bcbc276013d9dc2093576cca"
+  digest = "1:d255e3d914d8785bd558c26517d9a64191448e7c2a0f8f56af9cf01d52b0798b"
   name = "github.com/argoproj/argo"
   packages = [
     ".",
@@ -28,11 +28,6 @@
     "pkg/client/clientset/versioned",
     "pkg/client/clientset/versioned/scheme",
     "pkg/client/clientset/versioned/typed/workflow/v1alpha1",
-    "pkg/client/informers/externalversions",
-    "pkg/client/informers/externalversions/internalinterfaces",
-    "pkg/client/informers/externalversions/workflow",
-    "pkg/client/informers/externalversions/workflow/v1alpha1",
-    "pkg/client/listers/workflow/v1alpha1",
     "util/cmd",
     "util/retry",
     "util/unstructured",
@@ -46,12 +41,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1e8217b8eaaa458ae7fe16c0c7994899341033ab43a451c8f0c36131de2a52f4"
+  digest = "1:9eacec8a290837e78e83dcd4f7f708df24e11f15fbfd562ac838cc7a0c01697e"
   name = "github.com/argoproj/pkg"
-  packages = [
-    "errors",
-    "json",
-  ]
+  packages = ["json"]
   pruneopts = "NUT"
   revision = "1aa3e0c55668da17703adba5c534fff6930db589"
 
@@ -408,6 +400,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:5325f65188f8a9559c8f20d703b2b2684333a5e03515b6c1fbf09ffc710415af"
+  name = "golang.org/x/sync"
+  packages = ["singleflight"]
+  pruneopts = "NUT"
+  revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
+
+[[projects]]
+  branch = "master"
   digest = "1:f7c0fbb5d4513f08cc49b533f6102ccafbff435e2dd6662cb623571fd7aae28f"
   name = "golang.org/x/sys"
   packages = [
@@ -635,10 +635,8 @@
     "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1",
     "github.com/argoproj/argo/pkg/client/clientset/versioned",
     "github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1",
-    "github.com/argoproj/argo/pkg/client/informers/externalversions",
     "github.com/argoproj/argo/workflow/util",
     "github.com/argoproj/argo/workflow/validate",
-    "github.com/argoproj/pkg/errors",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",
@@ -647,11 +645,11 @@
     "github.com/shurcooL/graphql",
     "github.com/sirupsen/logrus",
     "github.com/urfave/cli",
+    "golang.org/x/sync/singleflight",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/rest",
-    "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api",
   ]

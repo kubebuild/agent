@@ -1,17 +1,8 @@
 package schedulers
 
 import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
-	"io/ioutil"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/kubebuild/agent/pkg/workflow"
 
 	"k8s.io/client-go/kubernetes"
@@ -34,16 +25,19 @@ type BuildScheduler struct {
 	cluster        graphql.Cluster
 	workflowClient v1alpha1.WorkflowInterface
 	kubeClient     kubernetes.Interface
+	logUploader    *workflow.LogUploader
 }
 
 // NewBuildScheduler schedule builds
 func NewBuildScheduler(workflowClient v1alpha1.WorkflowInterface, graphqlClient *graphql.Client, kubeClient kubernetes.Interface, log *logrus.Logger) *BuildScheduler {
+	logUploader := workflow.NewLogUploader(graphqlClient.Cluster, kubeClient, log)
 	return &BuildScheduler{
 		log:            log,
 		graphqlClient:  graphqlClient,
 		cluster:        graphqlClient.Cluster,
 		workflowClient: workflowClient,
 		kubeClient:     kubeClient,
+		logUploader:    logUploader,
 	}
 }
 
@@ -103,7 +97,7 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 		params.FinishedAt = &types.DateTime{Time: newWf.Status.FinishedAt.Time.UTC()}
 	}
 	b.graphqlClient.UpdateClusterBuild(params)
-	b.uploadLogs(newWf, build)
+	go b.logUploader.UploadWorkflowLogs(newWf, build)
 }
 
 func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
@@ -185,59 +179,4 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 		b.log.WithError(err).Error("Failed to update build")
 	}
 	b.log.WithField("buildID", buildWithID.ID).Info("updated")
-}
-
-func (b *BuildScheduler) uploadLogs(wf *wfv1.Workflow, build graphql.RunningBuild) {
-	metaTime := &metav1.Time{Time: build.StartedAt.Time}
-	logPrinter := workflow.NewLogPrinter(b.kubeClient, b.log, false, metaTime)
-
-	bufferMap := logPrinter.GetWorkflowLogs(wf)
-
-	creds := credentials.Value{
-		AccessKeyID:     string(build.Cluster.LogAwsKey),
-		SecretAccessKey: string(build.Cluster.LogAwsSecret),
-	}
-
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(string(build.LogRegion)),
-		Credentials: credentials.NewStaticCredentialsFromCreds(creds),
-	}))
-
-	bucket := fmt.Sprintf("kubebuild-logs-%s", build.LogRegion)
-	svc := s3manager.NewUploader(sess)
-
-	for k, v := range bufferMap {
-
-		s := strings.Split(k, workflow.BufferDelim)
-		podName, container := s[0], s[1]
-		var gZipBuffer bytes.Buffer
-
-		w := gzip.NewWriter(&gZipBuffer)
-		bytes, err := ioutil.ReadAll(&v)
-		if err != nil {
-			b.log.WithError(err).Error("cannot read buffer")
-		}
-		_, err = w.Write(bytes)
-
-		if err != nil {
-			b.log.WithError(err).Error("cannot gzip file")
-		}
-		w.Close()
-
-		key := fmt.Sprintf("%s/%s/%s/%s", b.cluster.Name, build.ID, podName, container)
-		_, err = svc.Upload(&s3manager.UploadInput{
-			ACL:             aws.String("public-read"),
-			CacheControl:    aws.String("no-cache"),
-			ContentType:     aws.String("text/plain; charset=utf-8"),
-			ContentEncoding: aws.String("gzip"),
-			Expires:         aws.Time(time.Now().AddDate(0, 1, 0)),
-			Bucket:          aws.String(bucket),
-			Key:             aws.String(key),
-			Body:            &gZipBuffer,
-		})
-
-		if err != nil {
-			b.log.WithError(err).Error("failed to upload logs")
-		}
-	}
 }
