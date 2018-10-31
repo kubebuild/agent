@@ -26,6 +26,14 @@ type ScheduledBuild struct {
 	}
 }
 
+//CancelingBuild struct for running build info
+type CancelingBuild struct {
+	ID        types.ID
+	Cluster   cluster
+	StartedAt types.DateTime
+	Workflow  types.JSON
+}
+
 //RunningBuild struct for running build info
 type RunningBuild struct {
 	ID        types.ID
@@ -48,14 +56,7 @@ type BuildQuery struct {
 	Scheduled []ScheduledBuild `graphql:"scheduled: buildsInCluster(clusterToken: $clusterToken, buildState: SCHEDULED)"`
 	Running   []RunningBuild   `graphql:"running: buildsInCluster(clusterToken: $clusterToken, buildState: RUNNING)"`
 	Blocked   []BlockedBuild   `graphql:"blocked: buildsInCluster(clusterToken: $clusterToken, buildState: BLOCKED)"`
-	// Logs []struct {
-	// 	ID          types.ID
-	// 	State       types.String
-	// 	StartedAt   types.DateTime
-	// 	FinishedAt  types.DateTime
-	// 	ScheduledAt types.DateTime
-	// 	Cluster     cluster
-	// } `graphql:"logs: buildsForLogs(clusterToken: $clusterToken)"`
+	Canceling []CancelingBuild `graphql:"canceling: buildsInCluster(clusterToken: $clusterToken, buildState: CANCELING)"`
 }
 
 // GetBuilds return the builds query

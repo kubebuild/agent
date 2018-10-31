@@ -45,10 +45,10 @@
   name = "github.com/argoproj/pkg"
   packages = ["json"]
   pruneopts = "NUT"
-  revision = "1aa3e0c55668da17703adba5c534fff6930db589"
+  revision = "a581a48d63014312c4f2762787f669e46bdb1fd9"
 
 [[projects]]
-  digest = "1:6e77b7993a7a7bdae0bcd6ea95ab6ccb2673adde8c114a0b1b23c99a8a8b1f3d"
+  digest = "1:2868a4580baab32196f56f3a7e9d97986405198a643ee1e7f1c13d199db10a92"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -88,8 +88,8 @@
     "service/sts",
   ]
   pruneopts = "NUT"
-  revision = "c446a547f59665b7ce54ac57bd8f8b04e5179563"
-  version = "v1.15.62"
+  revision = "fbdf992ab2dd55986179007336fc2072ea2d4eab"
+  version = "v1.15.65"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -135,7 +135,7 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "ef5f0afec364d3b9396b7b77b43dbe26bf1f8004"
-  version = "v0.17.1"
+  version = "v0.17.2"
 
 [[projects]]
   digest = "1:98abd61947ff5c7c6fcfec5473d02a4821ed3a2dd99a4fbfdb7925b0dd745546"
@@ -143,7 +143,7 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "8483a886a90412cd6858df4ea3483dce9c8e35a3"
-  version = "v0.17.1"
+  version = "v0.17.2"
 
 [[projects]]
   digest = "1:dfab391de021809e0041f0ab5648da6b74dd16a685472a1b8c3dc06b3dca1ee2"
@@ -151,7 +151,7 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "5bae59e25b21498baea7f9d46e9c147ec106a42e"
-  version = "v0.17.1"
+  version = "v0.17.2"
 
 [[projects]]
   digest = "1:983f95b2fae6fe8fdd361738325ed6090f4f3bd15ce4db745e899fb5b0fdfc46"
@@ -159,7 +159,7 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "5899d5c5e619fda5fa86e14795a835f473ca284c"
-  version = "v0.17.1"
+  version = "v0.17.2"
 
 [[projects]]
   digest = "1:8679b8a64f3613e9749c5640c3535c83399b8e69f67ce54d91dc73f6d77373af"
@@ -382,11 +382,11 @@
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "NUT"
-  revision = "0c41d7ab0a0ee717d4590a44bcb987dfd9e183eb"
+  revision = "4d3f4d9ffa16a13f451c3b2999e9c49e9750bf06"
 
 [[projects]]
   branch = "master"
-  digest = "1:d59fa2f6b43207b64304b29530b4c9c7d2466c1406429ab620ab68e689a868ac"
+  digest = "1:e8ebf48783cb48f83b2eb1212321c1fad0504e7e92880f69de319427d2109aed"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -396,7 +396,7 @@
     "idna",
   ]
   pruneopts = "NUT"
-  revision = "9b4f9f5ad5197c79fd623a3638e70d8b26cef344"
+  revision = "c44066c5c816ec500d459a2a324a753f78531ae0"
 
 [[projects]]
   branch = "master"
@@ -408,14 +408,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f7c0fbb5d4513f08cc49b533f6102ccafbff435e2dd6662cb623571fd7aae28f"
+  digest = "1:731e002c236eb2f5f3670dad4f73eafa36f6ea8899ec365d1c4ed0e08778e1ab"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "NUT"
-  revision = "44b849a8bc13eb42e95e6c6c5e360481b73ec710"
+  revision = "7e31e0c00fa05cb5fbf4347b585621d6709e19a4"
 
 [[projects]]
   digest = "1:e33513a825fcd765e97b5de639a2f7547542d1a8245df0cef18e1fd390b778a9"
@@ -626,7 +626,7 @@
   name = "k8s.io/kube-openapi"
   packages = ["pkg/common"]
   pruneopts = "NUT"
-  revision = "96e8bb74ecdddb93a882ef95d2b8ec49e93168ee"
+  revision = "0d1aeffe1c68f49accbd05c185ae534fe1372a3f"
 
 [solve-meta]
   analyzer-name = "dep"

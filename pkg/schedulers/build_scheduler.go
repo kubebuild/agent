@@ -2,6 +2,7 @@ package schedulers
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/kubebuild/agent/pkg/workflow"
@@ -18,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var shaMutex = &sync.Mutex{}
 
 // BuildScheduler schedule your builds
 type BuildScheduler struct {
@@ -52,26 +55,47 @@ func (b *BuildScheduler) Start() {
 			b.log.WithError(err).Error("can't get builds")
 			return
 		}
-		for _, build := range result.Scheduled {
-			b.scheduleBuild(build)
+		var scheduledWg sync.WaitGroup
+		scheduledWg.Add(len(result.Scheduled))
+		for i := range result.Scheduled {
+			go func(i int) {
+				defer scheduledWg.Done()
+				build := result.Scheduled[i]
+				b.scheduleBuild(build)
+			}(i)
 		}
-		for _, build := range result.Running {
-			b.runningBuild(build)
+		var runningWg sync.WaitGroup
+		runningWg.Add(len(result.Running))
+		for i := range result.Running {
+			go func(i int) {
+				defer runningWg.Done()
+				build := result.Running[i]
+				b.runningBuild(build)
+			}(i)
 		}
-		for _, build := range result.Blocked {
-			b.resumeSuspended(build)
+		var blockedWg sync.WaitGroup
+		blockedWg.Add(len(result.Blocked))
+		for i := range result.Blocked {
+			go func(i int) {
+				defer blockedWg.Done()
+				build := result.Blocked[i]
+				b.resumeSuspended(build)
+			}(i)
 		}
+		var cancelingWg sync.WaitGroup
+		cancelingWg.Add(len(result.Canceling))
+		for i := range result.Canceling {
+			go func(i int) {
+				defer cancelingWg.Done()
+				build := result.Canceling[i]
+				b.cancelBuild(build)
+			}(i)
+		}
+		scheduledWg.Wait()
+		runningWg.Wait()
+		blockedWg.Wait()
+		cancelingWg.Wait()
 	}, 2000, false)
-}
-
-func (b *BuildScheduler) scheduleBuild(build graphql.ScheduledBuild) {
-	b.log.WithField("buildID", build.ID).Info("Schedule")
-	buildOps := GetBuildOpts(b.cluster, build)
-	if build.UploadPipeline {
-		b.buildWithUploadPipeline(build, buildOps)
-	} else {
-		b.scheduleBuildWithExistingWf(build, buildOps)
-	}
 }
 
 func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
@@ -83,8 +107,43 @@ func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) grap
 	}
 }
 
+func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
+	b.log.WithField("buildID", build.ID).Debug("canceling")
+	wf := build.Workflow.Workflow
+	err := util.TerminateWorkflow(b.workflowClient, wf.GetName())
+	if err != nil {
+		b.log.WithError(err).Error("cannot terminate wf")
+	}
+	for {
+		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
+		if err != nil {
+			b.log.WithError(err).Error("cannot get canceled wf")
+			break
+		}
+		if util.IsWorkflowCompleted(newWf) {
+			params := b.defaultParams(build.ID, newWf)
+			params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
+			params.State = types.String(utils.Canceled)
+			params.CanceledAt = &types.DateTime{Time: time.Now().UTC()}
+			b.graphqlClient.UpdateClusterBuild(params)
+			break
+		}
+	}
+
+}
+
+func (b *BuildScheduler) scheduleBuild(build graphql.ScheduledBuild) {
+	b.log.WithField("buildID", build.ID).Debug("schedule")
+	buildOps := GetBuildOpts(b.cluster, build)
+	if build.UploadPipeline {
+		b.buildWithUploadPipeline(build, buildOps)
+	} else {
+		b.scheduleBuildWithExistingWf(build, buildOps)
+	}
+}
+
 func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
-	b.log.Info("Running")
+	b.log.WithField("buildID", build.ID).Debug("running")
 	wf := build.Workflow.Workflow
 	newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
 	if err != nil {
@@ -101,18 +160,22 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	}
 	buildID := fmt.Sprintf("%s", build.ID)
 	if shaMap[buildID] == nil {
+		shaMutex.Lock()
 		shaMap[buildID] = make(map[string]string)
+		shaMutex.Unlock()
 	}
 	b.graphqlClient.UpdateClusterBuild(params)
-	go b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID])
+	b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID], shaMutex)
 	if util.IsWorkflowCompleted(newWf) {
+		shaMutex.Lock()
 		delete(shaMap, buildID)
+		shaMutex.Unlock()
 	}
 }
 
 func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
 	if build.ResumeSuspended {
-		b.log.WithField("buildID", build.ID).Info("resuming build")
+		b.log.WithField("buildID", build.ID).Debug("resuming build")
 		wf := build.Workflow.Workflow
 		err := util.ResumeWorkflow(b.workflowClient, wf.GetName())
 		if err != nil {
@@ -188,5 +251,5 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	if err != nil {
 		b.log.WithError(err).Error("Failed to update build")
 	}
-	b.log.WithField("buildID", buildWithID.ID).Info("updated")
+	b.log.WithField("buildID", buildWithID.ID).Debug("updated")
 }

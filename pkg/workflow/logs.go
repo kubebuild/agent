@@ -54,7 +54,7 @@ type LogUploader struct {
 var BufferDelim = "||"
 
 // UploadWorkflowLogs upload wf logs
-func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.RunningBuild, shaMap map[string]string) {
+func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.RunningBuild, shaMap map[string]string, mutex *sync.Mutex) {
 	var requestGroup singleflight.Group
 
 	bufferMap := p.GetWorkflowLogs(wf)
@@ -86,7 +86,9 @@ func (p *LogUploader) UploadWorkflowLogs(wf *v1alpha1.Workflow, build graphql.Ru
 			p.log.WithField("container", k).Debug("skipping same shas")
 			continue
 		}
+		mutex.Lock()
 		shaMap[k] = bs
+		mutex.Unlock()
 
 		requestGroup.Do(k, func() (interface{}, error) {
 			return p.uploadToS3(k, svc, build, readBytes, bucket)
@@ -197,26 +199,28 @@ func getDisplayName(node v1alpha1.NodeStatus) string {
 }
 
 func (p *LogUploader) ensureContainerStarted(podName string, podNamespace string, container string, retryCnt int, retryTimeout time.Duration) error {
-	for retryCnt > 0 {
-		pod, err := p.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		var containerStatus *v1.ContainerStatus
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.Name == container {
-				containerStatus = &status
-				break
-			}
-		}
-		if containerStatus == nil || containerStatus.State.Waiting != nil {
-			time.Sleep(retryTimeout)
-			retryCnt--
-		} else {
-			return nil
+	// for retryCnt > 0 {
+	pod, err := p.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	var containerStatus *v1.ContainerStatus
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == container {
+			containerStatus = &status
+			break
 		}
 	}
-	return fmt.Errorf("container '%s' of pod '%s' has not started within expected timeout", container, podName)
+	if containerStatus == nil || containerStatus.State.Waiting != nil {
+		// time.Sleep(retryTimeout)
+		// retryCnt--
+		return fmt.Errorf("container '%s' of pod '%s' has not started within expected timeout", container, podName)
+	} else {
+		return nil
+	}
+	// }
+	// return fmt.Errorf("container '%s' of pod '%s' has not started within expected timeout", container, podName)
 }
 
 func (p *LogUploader) getPodLogs(
@@ -226,33 +230,45 @@ func (p *LogUploader) getPodLogs(
 		return err
 	}
 
-	for _, container := range pod.Spec.Containers {
+	var wg sync.WaitGroup
+	wg.Add(len(pod.Spec.Containers))
 
-		err := p.ensureContainerStarted(podName, podNamespace, container.Name, 1, time.Second)
-
-		if err != nil {
-			return err
-		}
-
-		stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
-			Container:  container.Name,
-			Timestamps: false,
-		}).Stream()
-
-		if err == nil {
-			scanner := bufio.NewScanner(stream)
-			for scanner.Scan() {
-				line := scanner.Text()
-
-				callback(LogEntry{
-					Pod:         podName,
-					DisplayName: DisplayName,
-					Container:   container.Name,
-					Line:        line,
-				})
-			}
-		}
+	containerStatusMap := make(map[string]v1.ContainerStatus)
+	for _, status := range pod.Status.ContainerStatuses {
+		containerStatusMap[status.Name] = status
 	}
+
+	for i := range pod.Spec.Containers {
+		container := pod.Spec.Containers[i]
+		go func() {
+			defer wg.Done()
+			containerStatus := containerStatusMap[container.Name]
+			if containerStatus.State.Waiting != nil {
+				return
+			}
+			p.log.WithField("container", container.Name).Debug("getting logs")
+
+			stream, err := p.kubeClient.CoreV1().Pods(podNamespace).GetLogs(podName, &v1.PodLogOptions{
+				Container:  container.Name,
+				Timestamps: false,
+			}).Stream()
+
+			if err == nil {
+				scanner := bufio.NewScanner(stream)
+				for scanner.Scan() {
+					line := scanner.Text()
+
+					callback(LogEntry{
+						Pod:         podName,
+						DisplayName: DisplayName,
+						Container:   container.Name,
+						Line:        line,
+					})
+				}
+			}
+		}()
+	}
+	wg.Wait()
 	return err
 }
 
