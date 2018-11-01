@@ -95,7 +95,7 @@ func (b *BuildScheduler) Start() {
 			}(i)
 		}
 		blockedWg.Wait()
-	}, 2000, false)
+	}, 1000, false)
 }
 
 func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
