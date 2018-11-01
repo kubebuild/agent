@@ -55,33 +55,6 @@ func (b *BuildScheduler) Start() {
 			b.log.WithError(err).Error("can't get builds")
 			return
 		}
-		var scheduledWg sync.WaitGroup
-		scheduledWg.Add(len(result.Scheduled))
-		for i := range result.Scheduled {
-			go func(i int) {
-				defer scheduledWg.Done()
-				build := result.Scheduled[i]
-				b.scheduleBuild(build)
-			}(i)
-		}
-		var runningWg sync.WaitGroup
-		runningWg.Add(len(result.Running))
-		for i := range result.Running {
-			go func(i int) {
-				defer runningWg.Done()
-				build := result.Running[i]
-				b.runningBuild(build)
-			}(i)
-		}
-		var blockedWg sync.WaitGroup
-		blockedWg.Add(len(result.Blocked))
-		for i := range result.Blocked {
-			go func(i int) {
-				defer blockedWg.Done()
-				build := result.Blocked[i]
-				b.resumeSuspended(build)
-			}(i)
-		}
 		var cancelingWg sync.WaitGroup
 		cancelingWg.Add(len(result.Canceling))
 		for i := range result.Canceling {
@@ -91,10 +64,37 @@ func (b *BuildScheduler) Start() {
 				b.cancelBuild(build)
 			}(i)
 		}
-		scheduledWg.Wait()
-		runningWg.Wait()
-		blockedWg.Wait()
 		cancelingWg.Wait()
+		var scheduledWg sync.WaitGroup
+		scheduledWg.Add(len(result.Scheduled))
+		for i := range result.Scheduled {
+			go func(i int) {
+				defer scheduledWg.Done()
+				build := result.Scheduled[i]
+				b.scheduleBuild(build)
+			}(i)
+		}
+		scheduledWg.Wait()
+		var runningWg sync.WaitGroup
+		runningWg.Add(len(result.Running))
+		for i := range result.Running {
+			go func(i int) {
+				defer runningWg.Done()
+				build := result.Running[i]
+				b.runningBuild(build)
+			}(i)
+		}
+		runningWg.Wait()
+		var blockedWg sync.WaitGroup
+		blockedWg.Add(len(result.Blocked))
+		for i := range result.Blocked {
+			go func(i int) {
+				defer blockedWg.Done()
+				build := result.Blocked[i]
+				b.resumeSuspended(build)
+			}(i)
+		}
+		blockedWg.Wait()
 	}, 2000, false)
 }
 
