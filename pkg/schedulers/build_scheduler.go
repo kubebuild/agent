@@ -158,13 +158,13 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	if util.IsWorkflowCompleted(newWf) {
 		params.FinishedAt = &types.DateTime{Time: newWf.Status.FinishedAt.Time.UTC()}
 	}
+	b.graphqlClient.UpdateClusterBuild(params)
 	buildID := fmt.Sprintf("%s", build.ID)
 	if shaMap[buildID] == nil {
 		shaMutex.Lock()
 		shaMap[buildID] = make(map[string]string)
 		shaMutex.Unlock()
 	}
-	b.graphqlClient.UpdateClusterBuild(params)
 	b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID], shaMutex)
 	if util.IsWorkflowCompleted(newWf) {
 		shaMutex.Lock()
