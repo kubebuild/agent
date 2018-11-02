@@ -118,18 +118,23 @@ func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
 		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
 		if err != nil {
 			b.log.WithError(err).Error("cannot get canceled wf")
+			b.updateCanceled(build, wf)
 			break
 		}
 		if util.IsWorkflowCompleted(newWf) {
-			params := b.defaultParams(build.ID, newWf)
-			params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
-			params.State = types.String(utils.Canceled)
-			params.CanceledAt = &types.DateTime{Time: time.Now().UTC()}
-			b.graphqlClient.UpdateClusterBuild(params)
+			b.updateCanceled(build, newWf)
 			break
 		}
 	}
 
+}
+
+func (b *BuildScheduler) updateCanceled(build graphql.CancelingBuild, wf *wfv1.Workflow) {
+	params := b.defaultParams(build.ID, wf)
+	params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
+	params.State = types.String(utils.Canceled)
+	params.CanceledAt = &types.DateTime{Time: time.Now().UTC()}
+	b.graphqlClient.UpdateClusterBuild(params)
 }
 
 func (b *BuildScheduler) scheduleBuild(build graphql.ScheduledBuild) {
