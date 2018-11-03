@@ -54,7 +54,6 @@ type BlockedBuild struct {
 //RetryBuild build to retry
 type RetryBuild struct {
 	ID        types.ID
-	Retry     types.Boolean
 	Workflow  types.JSON
 	StartedAt types.DateTime
 }
@@ -65,7 +64,7 @@ type BuildQuery struct {
 	Running   []RunningBuild   `graphql:"running: buildsInCluster(clusterToken: $clusterToken, buildState: RUNNING)"`
 	Blocked   []BlockedBuild   `graphql:"blocked: buildsInCluster(clusterToken: $clusterToken, buildState: BLOCKED)"`
 	Canceling []CancelingBuild `graphql:"canceling: buildsInCluster(clusterToken: $clusterToken, buildState: CANCELING)"`
-	Retry     []RetryBuild     `graphql:"retry: buildsToRetry(clusterToken: $clusterToken)"`
+	Retry     []RetryBuild     `graphql:"retry: buildsInCluster(clusterToken: $clusterToken, buildState: RETRYING)"`
 }
 
 // GetBuilds return the builds query

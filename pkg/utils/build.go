@@ -17,6 +17,7 @@ const (
 	Failed    State = "failed"
 	Canceled  State = "canceled"
 	Blocked   State = "blocked"
+	Retrying  State = "retrying"
 )
 
 var stateMap = buildMap()

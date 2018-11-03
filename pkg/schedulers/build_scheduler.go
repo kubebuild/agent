@@ -156,6 +156,10 @@ func (b *BuildScheduler) ensureTerminated(wf *wfv1.Workflow) bool {
 			if pod.Status.Phase == "Pending" {
 				return
 			}
+			mux.Lock()
+			terminatedPods = append(terminatedPods, pod.Name)
+			mux.Unlock()
+			return
 		}()
 
 	}
@@ -167,20 +171,23 @@ func (b *BuildScheduler) retryBuild(build graphql.RetryBuild) {
 	b.log.WithField("buildID", build.ID).Debug("retry")
 	wf := build.Workflow.Workflow
 
-	newWf, err := util.RetryWorkflow(b.kubeClient, b.workflowClient, wf)
-	if err != nil {
-		b.updateRetry(build, wf, types.String(utils.Failed))
-		b.log.WithError(err).Error("cannot build retry wf")
-		return
+	if b.ensureTerminated(wf) {
+		newWf, err := util.RetryWorkflow(b.kubeClient, b.workflowClient, wf)
+		if err != nil {
+			b.updateRetry(build, wf, types.String(utils.Failed))
+			b.log.WithError(err).Error("cannot build retry wf")
+			return
+		}
+
+		b.updateRetry(build, newWf, types.String(utils.Running))
 	}
-	b.updateRetry(build, newWf, types.String(utils.Running))
 }
 
 func (b *BuildScheduler) updateRetry(build graphql.RetryBuild, wf *wfv1.Workflow, state types.String) {
 	params := b.defaultParams(build.ID, wf)
-	params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
+	params.StartedAt = &types.DateTime{Time: time.Now().UTC()}
+	params.FinishedAt = nil
 	params.State = state
-	params.Retried = types.Boolean(true)
 	b.graphqlClient.UpdateClusterBuild(params)
 }
 
