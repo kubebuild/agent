@@ -85,6 +85,16 @@ func (b *BuildScheduler) Start() {
 			}(i)
 		}
 		runningWg.Wait()
+		var retryWg sync.WaitGroup
+		retryWg.Add(len(result.Retry))
+		for i := range result.Retry {
+			go func(i int) {
+				defer retryWg.Done()
+				build := result.Retry[i]
+				b.retryBuild(build)
+			}(i)
+		}
+		retryWg.Wait()
 		var blockedWg sync.WaitGroup
 		blockedWg.Add(len(result.Blocked))
 		for i := range result.Blocked {
@@ -98,6 +108,14 @@ func (b *BuildScheduler) Start() {
 	}, 1000, false)
 }
 
+func getDisplayName(node wfv1.NodeStatus) string {
+	res := node.DisplayName
+	if res == "" {
+		res = node.Name
+	}
+	return res
+}
+
 func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
 	return graphql.BuildMutationParams{
 		BuildID:      buildID,
@@ -105,6 +123,65 @@ func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) grap
 		ClusterToken: b.cluster.Token,
 		State:        utils.MapPhaseToState(wf.Status.Phase, false),
 	}
+}
+
+func (b *BuildScheduler) ensureTerminated(wf *wfv1.Workflow) bool {
+	var podNodes []wfv1.NodeStatus
+	for _, node := range wf.Status.Nodes {
+		if node.Type == wfv1.NodeTypePod &&
+			(node.Phase == wfv1.NodeError || node.Phase == wfv1.NodeFailed) {
+			podNodes = append(podNodes, node)
+		}
+	}
+
+	var mux sync.Mutex
+	var terminatedPods []string
+	var wg sync.WaitGroup
+	wg.Add(len(podNodes))
+
+	for i := range podNodes {
+		node := podNodes[i]
+		podName := node.ID
+		podNamespace := wf.Namespace
+		go func() {
+			defer wg.Done()
+
+			pod, err := b.kubeClient.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+			if err != nil {
+				mux.Lock()
+				terminatedPods = append(terminatedPods, pod.Name)
+				mux.Unlock()
+				return
+			}
+			if pod.Status.Phase == "Pending" {
+				return
+			}
+		}()
+
+	}
+	wg.Wait()
+	return len(podNodes) == len(terminatedPods)
+}
+
+func (b *BuildScheduler) retryBuild(build graphql.RetryBuild) {
+	b.log.WithField("buildID", build.ID).Debug("retry")
+	wf := build.Workflow.Workflow
+
+	newWf, err := util.RetryWorkflow(b.kubeClient, b.workflowClient, wf)
+	if err != nil {
+		b.updateRetry(build, wf, types.String(utils.Failed))
+		b.log.WithError(err).Error("cannot build retry wf")
+		return
+	}
+	b.updateRetry(build, newWf, types.String(utils.Running))
+}
+
+func (b *BuildScheduler) updateRetry(build graphql.RetryBuild, wf *wfv1.Workflow, state types.String) {
+	params := b.defaultParams(build.ID, wf)
+	params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
+	params.State = state
+	params.Retried = types.Boolean(true)
+	b.graphqlClient.UpdateClusterBuild(params)
 }
 
 func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
@@ -122,6 +199,13 @@ func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
 			break
 		}
 		if util.IsWorkflowCompleted(newWf) {
+			if newWf.Status.Phase == "Succeeded" {
+				params := b.defaultParams(build.ID, newWf)
+				params.State = utils.MapPhaseToState(newWf.Status.Phase, false)
+				params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
+				b.graphqlClient.UpdateClusterBuild(params)
+				break
+			}
 			b.updateCanceled(build, newWf)
 			break
 		}
