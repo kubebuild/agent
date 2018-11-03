@@ -79,6 +79,10 @@ dep ensure -add github.com/kubebuild/package
 1. Push to the branch (`git push origin my-new-feature`)
 1. Create new Pull Request
 
+## Running it locally
+
+```go run cmd/kubebuild-agent/kubebuild-agent.go --token dev-token --graphql-url http://localhost:4000/graphql --log-level debug --kubectl-path ~/.kube/config```
+
 ## Contributors
 
 ## Copyright
