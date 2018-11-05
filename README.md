@@ -1,7 +1,5 @@
 # KubeBuild Agent 
 
-_Note: This is the development branch of the kubebuild-agent, and may not contain files or code in the current stable release._
-
 The kubebuild-agent is a small, reliable, and kubernetes build runner that makes it easy to run automated builds on your own infrastructure. It’s main responsibilities are polling [kubebuild.com](https://www.kubebuild.com/) for work, running build jobs, reporting back the status code and output log of the job, and uploading the job's artifacts.
 
 Full documentation is available at [docs.kubebuild.com/agent](https://docs.kubebuild.com/agent)
