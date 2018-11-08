@@ -11,6 +11,28 @@ type cluster struct {
 	LogAwsSecret types.String
 }
 
+//Authentication auth for github
+type Authentication struct {
+	Provider types.String
+	Token    types.String
+}
+
+//Organization with auth
+type Organization struct {
+	ID              types.ID
+	Name            types.String
+	Authentications []Authentication
+}
+
+//Pipeline struct containing pipe data
+type Pipeline struct {
+	ID            types.ID
+	Name          types.String
+	GitURL        types.String
+	GitSecretName *types.String
+	Organization  Organization
+}
+
 //ScheduledBuild type for scheduled builds
 type ScheduledBuild struct {
 	ID             types.ID
@@ -20,27 +42,28 @@ type ScheduledBuild struct {
 	UploadPipeline types.Boolean
 	Template       *types.WorkflowYaml
 	PipeupWorkflow *types.JSON
-	Pipeline       struct {
-		GitURL        types.String
-		GitSecretName *types.String
-	}
+	Pipeline       Pipeline
 }
 
 //CancelingBuild struct for running build info
 type CancelingBuild struct {
 	ID        types.ID
 	Cluster   cluster
+	Commit    types.String
 	StartedAt types.DateTime
 	Workflow  types.JSON
+	Pipeline  Pipeline
 }
 
 //RunningBuild struct for running build info
 type RunningBuild struct {
 	ID        types.ID
 	Cluster   cluster
+	Commit    types.String
 	LogRegion types.String
 	StartedAt types.DateTime
 	Workflow  types.JSON
+	Pipeline  Pipeline
 }
 
 //BlockedBuild to resume suspended

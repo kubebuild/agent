@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubebuild/agent/pkg/gitstatus"
 	"github.com/kubebuild/agent/pkg/workflow"
 
 	"k8s.io/client-go/kubernetes"
@@ -108,14 +109,6 @@ func (b *BuildScheduler) Start() {
 	}, 1000, false)
 }
 
-func getDisplayName(node wfv1.NodeStatus) string {
-	res := node.DisplayName
-	if res == "" {
-		res = node.Name
-	}
-	return res
-}
-
 func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
 	return graphql.BuildMutationParams{
 		BuildID:      buildID,
@@ -206,11 +199,13 @@ func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
 			break
 		}
 		if util.IsWorkflowCompleted(newWf) {
+			gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
 			if newWf.Status.Phase == "Succeeded" {
 				params := b.defaultParams(build.ID, newWf)
 				params.State = utils.MapPhaseToState(newWf.Status.Phase, false)
 				params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
 				b.graphqlClient.UpdateClusterBuild(params)
+				go gitclient.SendNotification(wf, build.Commit, build.ID, build.Pipeline)
 				break
 			}
 			b.updateCanceled(build, newWf)
@@ -261,6 +256,10 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 		shaMap[buildID] = make(map[string]string)
 		shaMutex.Unlock()
 	}
+
+	gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
+	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Pipeline)
+
 	b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID], shaMutex)
 	if util.IsWorkflowCompleted(newWf) {
 		shaMutex.Lock()
@@ -344,6 +343,8 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	params.StartedAt = &types.DateTime{Time: time.Now().UTC()}
 
 	buildWithID, err := b.graphqlClient.UpdateClusterBuild(params)
+	gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
+	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Pipeline)
 	if err != nil {
 		b.log.WithError(err).Error("Failed to update build")
 	}

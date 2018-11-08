@@ -195,6 +195,22 @@
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:f4f203acd8b11b8747bdcd91696a01dbc95ccb9e2ca2db6abf81c3a4f5e950ce"
+  name = "github.com/google/go-github"
+  packages = ["github"]
+  pruneopts = "NUT"
+  revision = "f55b50f38167644bb7e4be03d9a2bde71d435239"
+  version = "v18.2.0"
+
+[[projects]]
+  digest = "1:a63cff6b5d8b95638bfe300385d93b2a6d9d687734b863da8e09dc834510a690"
+  name = "github.com/google/go-querystring"
+  packages = ["query"]
+  pruneopts = "NUT"
+  revision = "44c6ddd0a2342c386950e880b658017258da92fc"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   digest = "1:52c5834e2bebac9030c97cc0798ac11c3aa8a39f098aeb419f142533da6cd3cc"
   name = "github.com/google/gofuzz"
@@ -213,6 +229,14 @@
   pruneopts = "NUT"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:b9609bf6d4eabc981334691828aab22d97dcba62a6e3d566a13bb1597a13eb4c"
+  name = "github.com/gosimple/slug"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "283c8d10b72e48ecfd721b1739de574713e57a0b"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:b42cde0e1f3c816dd57f57f7bbcf05ca40263ad96f168714c130c611fc0856a6"
@@ -310,6 +334,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:16e2136a67ec44aa2d1d6b0fd65394b3c4a8b2a1b6730c77967f7b7b06b179b2"
+  name = "github.com/rainycape/unidecode"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "cb7f23ec59bec0d61b19c56cd88cee3d0cc1870c"
+
+[[projects]]
+  branch = "master"
   digest = "1:ddaa79b37808fbd09a1c3f484bba6320c884664dfc25ccc5f2d7d5a82222177c"
   name = "github.com/shurcooL/go"
   packages = ["ctxhttp"]
@@ -386,10 +418,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e8ebf48783cb48f83b2eb1212321c1fad0504e7e92880f69de319427d2109aed"
+  digest = "1:b59cff279e8202a534abda1cea9ca62d10a32df8dbe390852acc8b4016d61be7"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "context/ctxhttp",
     "http/httpguts",
     "http2",
     "http2/hpack",
@@ -397,6 +430,17 @@
   ]
   pruneopts = "NUT"
   revision = "c44066c5c816ec500d459a2a324a753f78531ae0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:208fa2a5bef7c22d8b50ec312ef469b2abaa5afeb9e04fe4d27bf28952bceab7"
+  name = "golang.org/x/oauth2"
+  packages = [
+    ".",
+    "internal",
+  ]
+  pruneopts = "NUT"
+  revision = "f42d05182288abf10faef86d16c0d07b8d40ea2d"
 
 [[projects]]
   branch = "master"
@@ -448,6 +492,22 @@
   packages = ["rate"]
   pruneopts = "NUT"
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
+
+[[projects]]
+  digest = "1:655acbef8faad33db29b6a35655341fb4a594e87e56635f05a3e70ed0bd7bd95"
+  name = "google.golang.org/appengine"
+  packages = [
+    "internal",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch",
+  ]
+  pruneopts = "NUT"
+  revision = "4a4468ece617fc8205e99368fa2200e9d1fad421"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
@@ -642,9 +702,12 @@
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/ghodss/yaml",
+    "github.com/google/go-github/github",
+    "github.com/gosimple/slug",
     "github.com/shurcooL/graphql",
     "github.com/sirupsen/logrus",
     "github.com/urfave/cli",
+    "golang.org/x/oauth2",
     "golang.org/x/sync/singleflight",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
