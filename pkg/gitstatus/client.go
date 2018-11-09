@@ -23,7 +23,8 @@ type Client struct {
 
 //NewGithubClient returns client for github
 func NewGithubClient(log *logrus.Logger, organization graphql.Organization) *Client {
-	if organization.Authentications[0].Provider == "github" {
+	if len(organization.Authentications) > 0 &&
+		organization.Authentications[0].Provider == "github" {
 		ctx := context.Background()
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: string(organization.Authentications[0].Token)},
