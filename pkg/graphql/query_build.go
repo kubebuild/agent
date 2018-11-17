@@ -21,7 +21,7 @@ type Authentication struct {
 type Organization struct {
 	ID              types.ID
 	Name            types.String
-	Authentications []Authentication
+	Authentications []*Authentication
 }
 
 //Pipeline struct containing pipe data
