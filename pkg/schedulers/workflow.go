@@ -3,10 +3,13 @@ package schedulers
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/argoproj/argo/workflow/util"
 	"github.com/kubebuild/agent/pkg/graphql"
+	"github.com/kubebuild/agent/pkg/types"
+	"github.com/kubebuild/agent/pkg/utils"
 )
 
 // Build labels
@@ -53,4 +56,16 @@ func AddBuildLabels(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 	wf.SetLabels(labels)
 	ttlWf := int32(2 * 60 * 60)
 	wf.Spec.TTLSecondsAfterFinished = &ttlWf
+}
+
+// FailBuild build fail on error
+func (b *BuildScheduler) FailBuild(buildID string, wf *wfv1.Workflow, err error) {
+	wf.Status.Message = err.Error()
+
+	params := b.defaultParams(buildID, wf)
+	params.State = types.String(utils.Failed)
+	params.StartedAt = &types.DateTime{Time: time.Now().UTC()}
+	params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
+
+	b.graphqlClient.UpdateClusterBuild(params)
 }

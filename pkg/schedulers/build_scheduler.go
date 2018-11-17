@@ -328,15 +328,19 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 		return
 	}
 	wf := template.Workflow
+	AddBuildLabels(build, wf)
+	buildID := fmt.Sprintf("%s", build.ID)
 	err := validate.ValidateWorkflow(wf, true)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed validation")
-		// Todo set Error label ?
+		b.FailBuild(buildID, wf, err)
+		return
 	}
-	AddBuildLabels(build, wf)
 	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")
+		b.FailBuild(buildID, wf, err)
+		return
 	}
 	params := b.defaultParams(build.ID, newWf)
 	params.State = types.String(utils.Running)
