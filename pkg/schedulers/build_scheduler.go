@@ -304,6 +304,7 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 		if err != nil {
 			b.log.WithError(err).Error("cannot get wf")
 			b.FailBuild(build.ID, wf, err)
+			return
 		}
 
 		params.PipeupWorkflow = &types.JSON{Workflow: newWf}
@@ -317,6 +318,8 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 		pipeResultWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 		if err != nil {
 			b.log.WithError(err).Error("pipe wf failed submit")
+			b.FailBuild(build.ID, wf, err)
+			return
 		}
 		params.PipeupWorkflow = &types.JSON{Workflow: pipeResultWf}
 	}
