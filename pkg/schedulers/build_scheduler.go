@@ -13,7 +13,6 @@ import (
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
 	"github.com/argoproj/argo/workflow/util"
-	"github.com/argoproj/argo/workflow/validate"
 	"github.com/kubebuild/agent/pkg/graphql"
 	"github.com/kubebuild/agent/pkg/types"
 	"github.com/kubebuild/agent/pkg/utils"
@@ -334,12 +333,12 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	}
 	wf := template.Workflow
 	AddBuildLabels(build, wf)
-	err := validate.ValidateWorkflow(wf, true)
-	if err != nil {
-		b.log.WithError(err).Error("workflow failed validation")
-		b.FailBuild(build.ID, wf, err)
-		return
-	}
+	// err := validate.ValidateWorkflow(wf, true)
+	// if err != nil {
+	// 	b.log.WithError(err).Error("workflow failed validation")
+	// 	b.FailBuild(build.ID, wf, err)
+	// 	return
+	// }
 	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")
