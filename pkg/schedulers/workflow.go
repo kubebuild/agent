@@ -59,7 +59,8 @@ func AddBuildLabels(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 }
 
 // FailBuild build fail on error
-func (b *BuildScheduler) FailBuild(buildID string, wf *wfv1.Workflow, err error) {
+func (b *BuildScheduler) FailBuild(buildID types.ID, wf *wfv1.Workflow, err error) {
+	buildID = fmt.Sprintf("%s", buildID)
 	wf.Status.Message = err.Error()
 
 	params := b.defaultParams(buildID, wf)

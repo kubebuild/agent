@@ -300,8 +300,10 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 	if build.PipeupWorkflow != nil {
 		wf := build.PipeupWorkflow.Workflow
 		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
+		// TODO: add check for pods if they are stuck in restart loop cancel and fail
 		if err != nil {
 			b.log.WithError(err).Error("cannot get wf")
+			b.FailBuild(build.ID, wf, err)
 		}
 
 		params.PipeupWorkflow = &types.JSON{Workflow: newWf}
@@ -329,17 +331,16 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	}
 	wf := template.Workflow
 	AddBuildLabels(build, wf)
-	buildID := fmt.Sprintf("%s", build.ID)
 	err := validate.ValidateWorkflow(wf, true)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed validation")
-		b.FailBuild(buildID, wf, err)
+		b.FailBuild(build.ID, wf, err)
 		return
 	}
 	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")
-		b.FailBuild(buildID, wf, err)
+		b.FailBuild(build.ID, wf, err)
 		return
 	}
 	params := b.defaultParams(build.ID, newWf)
