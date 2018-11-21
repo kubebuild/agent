@@ -9,7 +9,9 @@ import (
 	"github.com/argoproj/argo/workflow/util"
 	"github.com/kubebuild/agent/pkg/graphql"
 	"github.com/kubebuild/agent/pkg/types"
+
 	"github.com/kubebuild/agent/pkg/utils"
+	apiv1 "k8s.io/api/core/v1"
 )
 
 // Build labels
@@ -44,8 +46,8 @@ func getParams(cluster graphql.Cluster, build graphql.ScheduledBuild) []string {
 	return params
 }
 
-// AddBuildLabels adds the labels for the build
-func AddBuildLabels(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
+// PrepareWorkflow adds the labels for the build
+func PrepareWorkflow(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 	labels := wf.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
@@ -56,6 +58,24 @@ func AddBuildLabels(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 	wf.SetLabels(labels)
 	ttlWf := int32(2 * 60 * 60)
 	wf.Spec.TTLSecondsAfterFinished = &ttlWf
+	if build.Pipeline.EnvConfigMap != nil {
+		envFrom := apiv1.EnvFromSource{
+			ConfigMapRef: &apiv1.ConfigMapEnvSource{
+				LocalObjectReference: apiv1.LocalObjectReference{
+					Name: fmt.Sprintf("%s", *build.Pipeline.EnvConfigMap),
+				},
+			},
+		}
+		envFromSource := []apiv1.EnvFromSource{envFrom}
+		for _, template := range wf.Spec.Templates {
+			if template.Container != nil {
+				template.Container.EnvFrom = append(envFromSource, template.Container.EnvFrom...)
+			}
+			for _, sidecar := range template.Sidecars {
+				sidecar.EnvFrom = append(envFromSource, sidecar.EnvFrom...)
+			}
+		}
+	}
 }
 
 // FailBuild build fail on error

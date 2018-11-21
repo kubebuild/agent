@@ -332,13 +332,7 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 		return
 	}
 	wf := template.Workflow
-	AddBuildLabels(build, wf)
-	// err := validate.ValidateWorkflow(wf, true)
-	// if err != nil {
-	// 	b.log.WithError(err).Error("workflow failed validation")
-	// 	b.FailBuild(build.ID, wf, err)
-	// 	return
-	// }
+	PrepareWorkflow(build, wf)
 	newWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 	if err != nil {
 		b.log.WithError(err).Error("workflow failed submit")

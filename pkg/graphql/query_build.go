@@ -30,6 +30,7 @@ type Pipeline struct {
 	Name          types.String
 	GitURL        types.String
 	GitSecretName *types.String
+	EnvConfigMap  *types.String
 	Organization  Organization
 }
 
