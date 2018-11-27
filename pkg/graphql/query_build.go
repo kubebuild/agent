@@ -41,6 +41,7 @@ type ScheduledBuild struct {
 	Branch         types.String
 	Commit         types.String
 	UploadPipeline types.Boolean
+	IsPullRequest  types.Boolean
 	Template       *types.WorkflowYaml
 	PipeupWorkflow *types.JSON
 	Pipeline       Pipeline
