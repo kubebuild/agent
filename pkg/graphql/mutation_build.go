@@ -15,7 +15,7 @@ type updateBuilMutation struct {
 	UpdateClusterBuild struct {
 		Successful types.Boolean
 		Result     BuildWithID
-	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, pipeupWorkflow: $pipeupWorkflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, uploadPipeline: $uploadPipeline, resumeSuspended: $resumeSuspended, canceledAt: $canceledAt)"`
+	} `graphql:"updateClusterBuild(clusterToken: $clusterToken, buildId: $buildId, workflow: $workflow, pipeupWorkflow: $pipeupWorkflow, startedAt: $startedAt, state: $state, finishedAt: $finishedAt, uploadPipeline: $uploadPipeline, resumeSuspended: $resumeSuspended, canceledAt: $canceledAt, errorMessage: $errorMessage)"`
 }
 
 // BuildMutationParams some params for build mutation
@@ -30,6 +30,7 @@ type BuildMutationParams struct {
 	UploadPipeline  *types.Boolean
 	ResumeSuspended *types.Boolean
 	PipeupWorkflow  *types.JSON
+	ErrorMessage    *types.String
 }
 
 //UpdateClusterBuild variations
@@ -53,6 +54,7 @@ func (m *Client) UpdateClusterBuild(params BuildMutationParams) (BuildWithID, er
 		"canceledAt":      params.CanceledAt,
 		"pipeupWorkflow":  params.PipeupWorkflow,
 		"resumeSuspended": params.ResumeSuspended,
+		"errorMessage":    params.ErrorMessage,
 	}
 	err := m.GraphqlClient.Mutate(context.Background(), buildMutation, variables)
 	if err != nil {

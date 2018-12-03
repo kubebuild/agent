@@ -277,7 +277,7 @@ func (b *BuildScheduler) resumeSuspended(build graphql.BlockedBuild) {
 		}
 		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
 		if err != nil {
-			b.log.WithError(err).Error("cannot get wf")
+			b.log.WithError(err).Error("cannot get workflow")
 		}
 		params := b.defaultParams(build.ID, newWf)
 		params.StartedAt = &types.DateTime{Time: build.StartedAt.Time.UTC()}
@@ -299,9 +299,8 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 	if build.PipeupWorkflow != nil {
 		wf := build.PipeupWorkflow.Workflow
 		newWf, err := b.workflowClient.Get(wf.GetName(), metav1.GetOptions{})
-		// TODO: add check for pods if they are stuck in restart loop cancel and fail
 		if err != nil {
-			b.log.WithError(err).Error("cannot get wf")
+			b.log.WithError(err).Error("cannot get workflow")
 			b.FailBuild(build.ID, wf, err)
 			return
 		}
@@ -316,7 +315,7 @@ func (b *BuildScheduler) buildWithUploadPipeline(build graphql.ScheduledBuild, b
 		wf := b.createPipeUpTemplate(build)
 		pipeResultWf, err := util.SubmitWorkflow(b.workflowClient, wf, buildOps)
 		if err != nil {
-			b.log.WithError(err).Error("pipe wf failed submit")
+			b.log.WithError(err).Error("pipeup workflow failed submit")
 			b.FailBuild(build.ID, wf, err)
 			return
 		}
@@ -347,7 +346,7 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
 	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Pipeline)
 	if err != nil {
-		b.log.WithError(err).Error("Failed to update build")
+		b.log.WithError(err).Error("failed to update build")
 	}
 	b.log.WithField("buildID", buildWithID.ID).Debug("updated")
 }

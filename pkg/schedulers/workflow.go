@@ -82,12 +82,13 @@ func PrepareWorkflow(build graphql.ScheduledBuild, wf *wfv1.Workflow) {
 // FailBuild build fail on error
 func (b *BuildScheduler) FailBuild(buildID types.ID, wf *wfv1.Workflow, err error) {
 	buildID = fmt.Sprintf("%s", buildID)
-	wf.Status.Message = err.Error()
+	errorMessage := types.String(err.Error())
 
 	params := b.defaultParams(buildID, wf)
 	params.State = types.String(utils.Failed)
 	params.StartedAt = &types.DateTime{Time: time.Now().UTC()}
 	params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
+	params.ErrorMessage = &errorMessage
 
 	b.graphqlClient.UpdateClusterBuild(params)
 }
