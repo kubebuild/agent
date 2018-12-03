@@ -1,6 +1,7 @@
 package schedulers
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -109,6 +110,13 @@ func (b *BuildScheduler) Start() {
 }
 
 func (b *BuildScheduler) defaultParams(buildID types.ID, wf *wfv1.Workflow) graphql.BuildMutationParams {
+	if wf == nil {
+		return graphql.BuildMutationParams{
+			BuildID:      buildID,
+			ClusterToken: b.cluster.Token,
+			State:        types.String(utils.Failed),
+		}
+	}
 	return graphql.BuildMutationParams{
 		BuildID:      buildID,
 		Workflow:     &types.JSON{Workflow: wf},
@@ -328,6 +336,8 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 	template := build.Template
 	if template == nil {
 		b.log.Error("template is nil canont continue")
+		err := errors.New("template is nil canont continue")
+		b.FailBuild(build.ID, nil, err)
 		return
 	}
 	wf := template.Workflow
