@@ -180,11 +180,10 @@ func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, bui
 	if c.GitlabClient != nil && pipeline.Repository == "GITLAB" {
 		branch := string(buildBranch)
 		opts := &gitlab.SetCommitStatusOptions{
-			TargetURL:   url,
-			Ref:         &branch,
-			State:       gitlabState(wf.Status.Phase),
-			Description: getState(wf.Status.Phase),
-			Context:     &buildContext,
+			TargetURL: url,
+			Ref:       &branch,
+			State:     gitlabState(wf.Status.Phase),
+			Context:   &buildContext,
 		}
 		gitlabID := strings.Join([]string{owner, "/", repo}, "")
 		_, _, err := c.GitlabClient.Commits.SetCommitStatus(gitlabID, commit, opts)
