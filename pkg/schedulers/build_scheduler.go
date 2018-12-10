@@ -212,9 +212,11 @@ func (b *BuildScheduler) cancelBuild(build graphql.CancelingBuild) {
 				params.State = utils.MapPhaseToState(newWf.Status.Phase, false)
 				params.FinishedAt = &types.DateTime{Time: time.Now().UTC()}
 				b.graphqlClient.UpdateClusterBuild(params)
-				go gitclient.SendNotification(wf, build.Commit, build.ID, build.Pipeline)
+				gitclient.SendNotification(wf, build.Commit, build.ID, build.Branch, build.Pipeline)
+				gitclient.DeleteFromStatusMap(build.ID)
 				break
 			}
+			gitclient.DeleteFromStatusMap(build.ID)
 			b.updateCanceled(build, newWf)
 			break
 		}
@@ -265,8 +267,7 @@ func (b *BuildScheduler) runningBuild(build graphql.RunningBuild) {
 	}
 
 	gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
-	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Pipeline)
-
+	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Branch, build.Pipeline)
 	b.logUploader.UploadWorkflowLogs(newWf, build, shaMap[buildID], shaMutex)
 	if util.IsWorkflowCompleted(newWf) {
 		shaMutex.Lock()
@@ -354,7 +355,7 @@ func (b *BuildScheduler) scheduleBuildWithExistingWf(build graphql.ScheduledBuil
 
 	buildWithID, err := b.graphqlClient.UpdateClusterBuild(params)
 	gitclient := gitstatus.NewGithubClient(b.log, build.Pipeline.Organization)
-	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Pipeline)
+	go gitclient.SendNotification(newWf, build.Commit, build.ID, build.Branch, build.Pipeline)
 	if err != nil {
 		b.log.WithError(err).Error("failed to update build")
 	}

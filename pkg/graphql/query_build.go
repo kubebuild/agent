@@ -54,6 +54,7 @@ type CancelingBuild struct {
 	ID        types.ID
 	Cluster   cluster
 	Commit    types.String
+	Branch    types.String
 	StartedAt types.DateTime
 	Workflow  types.JSON
 	Pipeline  Pipeline
@@ -64,6 +65,7 @@ type RunningBuild struct {
 	ID        types.ID
 	Cluster   cluster
 	Commit    types.String
+	Branch    types.String
 	LogRegion types.String
 	StartedAt types.DateTime
 	Workflow  types.JSON

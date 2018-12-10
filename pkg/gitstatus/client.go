@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
+	"sync"
 
 	"github.com/google/go-github/github"
 	"github.com/gosimple/slug"
@@ -17,6 +19,9 @@ import (
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 )
 
+var statusMap = make(map[string]string)
+var statusMutex = &sync.Mutex{}
+
 //Constants for gitproivers
 const (
 	GithubProvider = "github"
@@ -28,6 +33,14 @@ type Client struct {
 	Log          *logrus.Logger
 	GithubClient *github.Client
 	GitlabClient *gitlab.Client
+}
+
+//DeleteFromStatusMap deletes build when finished
+func (c *Client) DeleteFromStatusMap(buildIDGql types.ID) {
+	buildID := fmt.Sprintf("%s", buildIDGql)
+	statusMutex.Lock()
+	delete(statusMap, buildID)
+	statusMutex.Unlock()
 }
 
 //NewGithubClient returns client for github
@@ -61,10 +74,20 @@ func NewGithubClient(log *logrus.Logger, organization graphql.Organization) *Cli
 
 }
 
+var (
+	isSchemeRegExp = regexp.MustCompile(`^http[s]?:\/\/`)
+	sshURLRegex    = regexp.MustCompile(`^git:\/\/|@[^\/:]+[\/:]([^\/:]+)\/(.+).git$`)
+	httpURLRegex   = regexp.MustCompile(`^http[s]?:\/\/[\w\.]+\/([^\/:]+)\/(.+).git$`)
+)
+
 func extractRepoAndOwner(gitURL string) (string, string) {
-	var extractRepo = regexp.MustCompile(`^https|git:\/\/|@[^\/:]+[\/:]([^\/:]+)\/(.+).git$`)
-	match := extractRepo.FindAllStringSubmatch(gitURL, -1)[0]
+	if isSchemeRegExp.MatchString(gitURL) {
+		match := httpURLRegex.FindAllStringSubmatch(gitURL, -1)[0]
+		return match[1], match[2]
+	}
+	match := sshURLRegex.FindAllStringSubmatch(gitURL, -1)[0]
 	return match[1], match[2]
+
 }
 
 func getURL(buildID string, pipeline graphql.Pipeline) *string {
@@ -85,6 +108,16 @@ func gitlabState(phase wfv1.NodePhase) gitlab.BuildStateValue {
 	default:
 		return gitlab.Pending
 	}
+}
+
+func statusChanged(buildID string, nodePhase wfv1.NodePhase) bool {
+	if statusMap[buildID] == string(nodePhase) {
+		return false
+	}
+	statusMutex.Lock()
+	statusMap[buildID] = string(nodePhase)
+	statusMutex.Unlock()
+	return true
 }
 
 func getState(phase wfv1.NodePhase) *string {
@@ -115,14 +148,18 @@ func urlEncoded(str string) (string, error) {
 }
 
 //SendNotification send notification to github
-func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, buildIDGql types.ID, pipeline graphql.Pipeline) {
+func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, buildIDGql types.ID, buildBranch types.String, pipeline graphql.Pipeline) {
+
+	buildID := fmt.Sprintf("%s", buildIDGql)
+	if !statusChanged(buildID, wf.Status.Phase) {
+		return
+	}
 	owner, repo := extractRepoAndOwner(string(pipeline.GitURL))
 	commit := string(commitSha)
-	buildID := fmt.Sprintf("%s", buildIDGql)
 	url := getURL(buildID, pipeline)
 	buildContext := fmt.Sprintf("kubebuild/%s", slug.Make(string(pipeline.Name)))
 
-	if c.GithubClient != nil && pipeline.Repository == GithubProvider {
+	if c.GithubClient != nil && pipeline.Repository == "GITHUB" {
 
 		status := &github.RepoStatus{
 			TargetURL:   url,
@@ -138,18 +175,17 @@ func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, bui
 			c.Log.WithError(err).Error("failed to send status to github")
 		}
 	}
-	if c.GitlabClient != nil && pipeline.Repository == GitlabProvider {
+	if c.GitlabClient != nil && pipeline.Repository == "GITLAB" {
+		branch := string(buildBranch)
 		opts := &gitlab.SetCommitStatusOptions{
 			TargetURL:   url,
+			Ref:         &branch,
 			State:       gitlabState(wf.Status.Phase),
 			Description: getState(wf.Status.Phase),
 			Context:     &buildContext,
 		}
-		gitlabID, err := urlEncoded(fmt.Sprintf("%s/%s", owner, repo))
-		if err != nil {
-			c.Log.WithError(err).Error("failed to encode id string")
-		}
-		_, _, err = c.GitlabClient.Commits.SetCommitStatus(gitlabID, commit, opts)
+		gitlabID := strings.Join([]string{owner, "/", repo}, "")
+		_, _, err := c.GitlabClient.Commits.SetCommitStatus(gitlabID, commit, opts)
 		if err != nil {
 			c.Log.WithError(err).Error("failed to failed to push status to gitlab")
 		}
