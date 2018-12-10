@@ -409,6 +409,14 @@
   revision = "dcecefd839c4193db0d35b88ec65b4c12d360ab0"
 
 [[projects]]
+  digest = "1:f22b36a96b48cc26a643f31a6fb098a7d0850d8fc13d0d4927ad8ac04e648f97"
+  name = "github.com/xanzy/go-gitlab"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "954568c5d9242be1fb907039d769952fa4f6bc70"
+  version = "v0.11.7"
+
+[[projects]]
   branch = "master"
   digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
   name = "golang.org/x/crypto"
@@ -696,7 +704,6 @@
     "github.com/argoproj/argo/pkg/client/clientset/versioned",
     "github.com/argoproj/argo/pkg/client/clientset/versioned/typed/workflow/v1alpha1",
     "github.com/argoproj/argo/workflow/util",
-    "github.com/argoproj/argo/workflow/validate",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",
@@ -707,6 +714,7 @@
     "github.com/shurcooL/graphql",
     "github.com/sirupsen/logrus",
     "github.com/urfave/cli",
+    "github.com/xanzy/go-gitlab",
     "golang.org/x/oauth2",
     "golang.org/x/sync/singleflight",
     "k8s.io/api/core/v1",

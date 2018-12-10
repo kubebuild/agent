@@ -13,8 +13,9 @@ type cluster struct {
 
 //Authentication auth for github
 type Authentication struct {
-	Provider types.String
-	Token    types.String
+	Provider  types.String
+	Token     types.String
+	GitlabURL *types.String
 }
 
 //Organization with auth
@@ -29,6 +30,7 @@ type Pipeline struct {
 	ID            types.ID
 	Name          types.String
 	GitURL        types.String
+	Repository    types.String
 	GitSecretName *types.String
 	EnvConfigMap  *types.String
 	Organization  Organization

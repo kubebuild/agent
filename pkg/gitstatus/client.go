@@ -10,37 +10,54 @@ import (
 	"github.com/kubebuild/agent/pkg/graphql"
 	"github.com/kubebuild/agent/pkg/types"
 	"github.com/sirupsen/logrus"
+	"github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
 
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
+)
+
+//Constants for gitproivers
+const (
+	GithubProvider = "github"
+	GitlabProvider = "gitlab"
 )
 
 //Client Struct
 type Client struct {
 	Log          *logrus.Logger
 	GithubClient *github.Client
+	GitlabClient *gitlab.Client
 }
 
 //NewGithubClient returns client for github
 func NewGithubClient(log *logrus.Logger, organization graphql.Organization) *Client {
-	if len(organization.Authentications) > 0 &&
-		organization.Authentications[0].Provider == "github" {
-		ctx := context.Background()
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: string(organization.Authentications[0].Token)},
-		)
-		tc := oauth2.NewClient(ctx, ts)
-
-		client := github.NewClient(tc)
-
-		return &Client{
-			Log:          log,
-			GithubClient: client,
-		}
-	}
-	return &Client{
+	client := &Client{
 		Log: log,
 	}
+	for _, auth := range organization.Authentications {
+		switch auth.Provider {
+		case GithubProvider:
+			ctx := context.Background()
+			ts := oauth2.StaticTokenSource(
+				&oauth2.Token{AccessToken: string(auth.Token)},
+			)
+			tc := oauth2.NewClient(ctx, ts)
+
+			githubClient := github.NewClient(tc)
+			client.GithubClient = githubClient
+		case GitlabProvider:
+			gitlabClient := gitlab.NewClient(nil, string(auth.Token))
+			gitlabClient.SetBaseURL(string(*auth.GitlabURL))
+
+			client.GitlabClient = gitlabClient
+		default:
+			log.Debug("no git provider skipping clinet")
+		}
+
+	}
+
+	return client
+
 }
 
 func extractRepoAndOwner(gitURL string) (string, string) {
@@ -52,6 +69,21 @@ func extractRepoAndOwner(gitURL string) (string, string) {
 func getURL(buildID string, pipeline graphql.Pipeline) *string {
 	ret := fmt.Sprintf("https://www.kubebuild.com/dashboard/organization/%s/pipeline/%s/build/%s", pipeline.Organization.ID, pipeline.ID, buildID)
 	return &ret
+}
+
+func gitlabState(phase wfv1.NodePhase) gitlab.BuildStateValue {
+	switch phase {
+	case wfv1.NodeError:
+		return gitlab.Failed
+	case wfv1.NodeFailed:
+		return gitlab.Failed
+	case wfv1.NodeSucceeded:
+		return gitlab.Success
+	case wfv1.NodeSkipped:
+		return gitlab.Skipped
+	default:
+		return gitlab.Pending
+	}
 }
 
 func getState(phase wfv1.NodePhase) *string {
@@ -74,11 +106,12 @@ func getState(phase wfv1.NodePhase) *string {
 }
 
 //SendNotification send notification to github
-func (c *Client) SendNotification(wf *wfv1.Workflow, commit types.String, buildID types.ID, pipeline graphql.Pipeline) {
-	if c.GithubClient != nil {
-		commit := string(commit)
-		buildID := fmt.Sprintf("%s", buildID)
-		owner, repo := extractRepoAndOwner(string(pipeline.GitURL))
+func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, buildIDGql types.ID, pipeline graphql.Pipeline) {
+	owner, repo := extractRepoAndOwner(string(pipeline.GitURL))
+	commit := string(commitSha)
+	buildID := fmt.Sprintf("%s", buildIDGql)
+
+	if c.GithubClient != nil && pipeline.Repository == GithubProvider {
 
 		buildContext := fmt.Sprintf("kubebuild/%s", slug.Make(string(pipeline.Name)))
 
@@ -95,5 +128,11 @@ func (c *Client) SendNotification(wf *wfv1.Workflow, commit types.String, buildI
 		if err != nil {
 			c.Log.WithError(err).Error("failed to send status to github")
 		}
+	}
+	if c.GitlabClient != nil && pipeline.Repository == GitlabProvider {
+		opts := &gitlab.SetCommitStatusOptions{
+			State: gitlabState(wf.Status.Phase),
+		}
+		c.GitlabClient.Commits.SetCommitStatus(repo, commit, opts)
 	}
 }
