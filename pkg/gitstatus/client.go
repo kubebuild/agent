@@ -3,6 +3,7 @@ package gitstatus
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 
 	"github.com/google/go-github/github"
@@ -105,18 +106,26 @@ func getState(phase wfv1.NodePhase) *string {
 	}
 }
 
+func urlEncoded(str string) (string, error) {
+	u, err := url.Parse(str)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
 //SendNotification send notification to github
 func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, buildIDGql types.ID, pipeline graphql.Pipeline) {
 	owner, repo := extractRepoAndOwner(string(pipeline.GitURL))
 	commit := string(commitSha)
 	buildID := fmt.Sprintf("%s", buildIDGql)
+	url := getURL(buildID, pipeline)
+	buildContext := fmt.Sprintf("kubebuild/%s", slug.Make(string(pipeline.Name)))
 
 	if c.GithubClient != nil && pipeline.Repository == GithubProvider {
 
-		buildContext := fmt.Sprintf("kubebuild/%s", slug.Make(string(pipeline.Name)))
-
 		status := &github.RepoStatus{
-			TargetURL:   getURL(buildID, pipeline),
+			TargetURL:   url,
 			State:       getState(wf.Status.Phase),
 			Description: getState(wf.Status.Phase),
 			Context:     &buildContext,
@@ -131,8 +140,18 @@ func (c *Client) SendNotification(wf *wfv1.Workflow, commitSha types.String, bui
 	}
 	if c.GitlabClient != nil && pipeline.Repository == GitlabProvider {
 		opts := &gitlab.SetCommitStatusOptions{
-			State: gitlabState(wf.Status.Phase),
+			TargetURL:   url,
+			State:       gitlabState(wf.Status.Phase),
+			Description: getState(wf.Status.Phase),
+			Context:     &buildContext,
 		}
-		c.GitlabClient.Commits.SetCommitStatus(repo, commit, opts)
+		gitlabID, err := urlEncoded(fmt.Sprintf("%s/%s", owner, repo))
+		if err != nil {
+			c.Log.WithError(err).Error("failed to encode id string")
+		}
+		_, _, err = c.GitlabClient.Commits.SetCommitStatus(gitlabID, commit, opts)
+		if err != nil {
+			c.Log.WithError(err).Error("failed to failed to push status to gitlab")
+		}
 	}
 }
