@@ -99,6 +99,8 @@ func gitlabState(phase wfv1.NodePhase) gitlab.BuildStateValue {
 	switch phase {
 	case wfv1.NodeError:
 		return gitlab.Failed
+	case wfv1.NodeRunning:
+		return gitlab.Running
 	case wfv1.NodeFailed:
 		return gitlab.Failed
 	case wfv1.NodeSucceeded:
